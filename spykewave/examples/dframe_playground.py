@@ -2,7 +2,7 @@
 # 
 # Created: Januar 25 2019
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-02-01 18:16:41>
+# Last modification time: <2019-02-04 11:27:41>
 
 # Builtin/3rd party package imports
 import dask
@@ -98,6 +98,26 @@ dframe1 = pd.DataFrame(dsets[0], columns=label[:int(hdr["M"])])
 dframe2 = pd.DataFrame(dsets[1], columns=label[int(hdr["M"]):])
 print("Memory usage after allocation of two dataframes: ", memory_usage()[0])
 
+# Access Channel #1 in first dataframe in different ways
+chan1 = dframe1.iloc[:,0]
+print("Memory usage after in-frame access of channel 1 via `iloc`: ", memory_usage()[0])
+chan1 = dframe1["channel1"]
+print("Memory usage after in-frame access of channel 1 by channel-name: ", memory_usage()[0])
+chan1 = dframe1.iloc[:,0].values
+print("Memory usage after extracting channel 1 as NumPy array via `iloc`: ", memory_usage()[0])
+chan1 = dframe1["channel1"].values
+print("Memory usage after extracting channel 1 as NumPy array by channel-name`: ", memory_usage()[0])
+
+# Access Channels #1-#3 in first dataframe in different ways
+multichan = dframe1.iloc[:,:3]
+print("Memory usage after accessing three channels via `iloc`: ", memory_usage()[0])
+multichan = dframe1[["channel1", "channel2", "channel3"]]
+print("Memory usage after accessing three channels by channel-name: ", memory_usage()[0])
+multichan = dframe1.iloc[:,:3].values
+print("Memory usage after extracting three channels as NumPy array via `iloc`: ", memory_usage()[0])
+multichan = dframe1[["channel1", "channel2", "channel3"]].values
+print("Memory usage after extracting three channels as NumPy array by channel-name`: ", memory_usage()[0])
+
 # Join memory-mapped dataframes (causes all memory maps to be loaded)
 bigframe = pd.concat([dframe1, dframe2])
 print("Memory usage after joining dataframes: ", memory_usage()[0])
@@ -106,7 +126,7 @@ print("Memory usage after joining dataframes: ", memory_usage()[0])
 del bigframe
 print("Memory usage after deleting joined dataframe: ", memory_usage()[0])
 
-# Try to leverage some delayed magic to avoid explicit loading of memmaps
+# An unsuccessful attempt at leveraging some delayed magic to avoid explicit loading of memmaps
 delayed_concat = dask.delayed(pd.concat)
 daskframe = dd.from_delayed(delayed_concat([df for df in [dframe1, dframe2]]))
 print("Memory usage after delayed join: ", memory_usage()[0])
