@@ -5,9 +5,6 @@
 # Created: 2019-01-23 09:56:41
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
 # Last modification time: <2019-03-04 14:40:55>
-"""
-Coming soon...
-"""
 
 # Import __all__ routines from local modules
 from .utils import *

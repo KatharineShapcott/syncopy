@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # 
-# SyNCoPy spectral estimation methods
+# Syncopy spectral estimation methods
 # 
 # Created: 2019-01-22 09:07:47
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-19 10:02:29>
+# Last modification time: <2019-07-24 17:26:20>
 
 # Builtin/3rd party package imports
 import sys
@@ -21,13 +21,12 @@ from copy import copy
 from numbers import Number
 
 # Local imports
-from syncopy.shared.parsers import data_parser, scalar_parser, array_parser 
+from syncopy.shared.parsers import data_parser, scalar_parser, array_parser, unwrap_cfg 
 from syncopy.shared import get_defaults
 from syncopy.shared.computational_routine import ComputationalRoutine
 from syncopy.datatype import SpectralData, padding
 import syncopy.specest.wavelets as spywave 
 from syncopy.shared.errors import SPYValueError, SPYTypeError
-from syncopy.shared.parsers import unwrap_cfg
 from syncopy import __dask__
 if __dask__:
     import dask

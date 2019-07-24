@@ -61,6 +61,7 @@ from .shared import *
 from .io import *
 from .datatype import *
 from .specest import *
+from .connectivity import *
 
 # Register session
 __session__ = datatype.base_data.SessionLogger()
@@ -82,5 +83,6 @@ __all__.extend(datatype.__all__)
 __all__.extend(io.__all__)
 __all__.extend(shared.__all__)
 __all__.extend(specest.__all__)
+__all__.extend(connectivity.__all__)
 __all__.extend([__version__, __dask__, __storage__, __storagelimit__,
                 __session__, __sessionid__, __tbcount__])
