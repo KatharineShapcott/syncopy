@@ -4,7 +4,7 @@
 # 
 # Created: 2019-05-13 09:18:55
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-18 14:21:15>
+# Last modification time: <2019-07-25 16:51:10>
 
 # Builtin/3rd party package imports
 import os
@@ -165,7 +165,9 @@ class ComputationalRoutine(ABC):
         # For trials of unequal length, compute output chunk-shape individually
         # to identify varying dimension(s). The aggregate shape is computed
         # as max across all chunks
-        if np.any([data._shapes[0] != sh for sh in data._shapes]):
+        if np.any(data._preview_trial(0).shape != data._preview_trial(tk).shape 
+                  for tk in range(data._sampleinfo.shape[0])):
+        # if np.any([data._shapes[0] != sh for sh in data._shapes]):
             chunkShape = list(chunkShape)
             chk_list = [chunkShape]
             for tk in range(1, len(data.trials)):
@@ -441,7 +443,9 @@ class ComputationalRoutine(ABC):
         data.mode = "r"
 
         # Depending on equidistance of trials use dask arrays directly...
-        if np.all([data._shapes[0] == sh for sh in data._shapes]):
+        # if np.all([data._shapes[0] == sh for sh in data._shapes]):
+        if np.all(data._preview_trial(0).shape == data._preview_trial(tk).shape 
+                  for tk in range(data._sampleinfo.shape[0])):
 
             # Point to trials on disk by using delayed **static** method calls
             lazy_trial = dask.delayed(data._copy_trial, traverse=False)

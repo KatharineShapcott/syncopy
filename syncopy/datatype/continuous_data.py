@@ -4,7 +4,7 @@
 # 
 # Created: 2019-03-20 11:11:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-19 09:49:21>
+# Last modification time: <2019-07-25 17:14:41>
 """Uniformly sampled (continuous data).
 
 This module holds classes to represent data with a uniformly sampled time axis.
@@ -20,7 +20,7 @@ from copy import copy
 from numpy.lib.format import open_memmap
 
 # Local imports
-from .base_data import BaseData, VirtualData
+from .base_data import BaseData, VirtualData, FauxTrial
 from .data_methods import _selectdata_continuous, definetrial
 from syncopy.shared.parsers import scalar_parser, array_parser, io_parser
 from syncopy.shared.errors import SPYValueError, SPYIOError
@@ -112,6 +112,7 @@ class ContinuousData(BaseData, ABC):
                         arr = h5f[h5keys[0]][idx]
                     else:
                         arr = h5f[spy.datatype.__all__[cnt.index(1)]][idx]
+                        # FIXME: if is_virtual just return the virtual source!
             except:
                 try:
                     arr = np.array(open_memmap(filename, mode="c")[idx])
@@ -130,9 +131,17 @@ class ContinuousData(BaseData, ABC):
     # Helper function that grabs a single trial
     def _get_trial(self, trialno):
         idx = [slice(None)] * len(self.dimord)
-        sid = self.dimord.index("time")
-        idx[sid] = slice(int(self.sampleinfo[trialno, 0]), int(self.sampleinfo[trialno, 1]))
+        idx[self.dimord.index("time")] = slice(int(self.sampleinfo[trialno, 0]), 
+                                               int(self.sampleinfo[trialno, 1]))
         return self._data[tuple(idx)]
+    
+    def _preview_trial(self, trialno):
+        shp = []
+        for dim in self.data.shape:
+            shp.append(slice(0, dim))
+        shp[self.dimord.index("time")] = slice(int(self.sampleinfo[trialno, 0]), 
+                                               int(self.sampleinfo[trialno, 1]))
+        return FauxTrial(shp, self.data.dtype)
         
     # Make instantiation persistent in all subclasses
     def __init__(self, **kwargs):

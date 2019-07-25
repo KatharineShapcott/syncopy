@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # 
-# SynCoPy BaseData abstract class + helper classes
+# Syncopy BaseData abstract class + helper classes
 # 
 # Created: 2019-01-07 09:22:33
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-23 16:57:14>
+# Last modification time: <2019-07-25 16:42:36>
 
 # Builtin/3rd party package imports
 import numpy as np
@@ -986,3 +986,10 @@ class StructDict(dict):
         """
         super().__init__(*args, **kwargs)
         self.__dict__ = self        
+
+
+class FauxTrial():
+    
+    def __init__(self, shape, dtype):
+        self.shape = tuple(shape)
+        self.dtype = dtype

@@ -48,9 +48,9 @@ def is_slurm_node():
     """
 
     # Simply test if the srun command is available
-    out, err = subprocess.Popen("srun --version",
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                text=True, shell=True).communicate()
+    out, _ = subprocess.Popen("srun --version",
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              text=True, shell=True).communicate()
     if len(out) > 0:
         return True
     else:
