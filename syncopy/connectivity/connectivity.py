@@ -4,19 +4,23 @@
 # 
 # Created: 2019-07-24 14:22:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-25 17:32:22>
+# Last modification time: <2019-07-26 17:14:53>
 
 # Builtin/3rd party package imports
+import os
 import sys
+import h5py
 import numpy as np
 
 # Local imports
 from syncopy.shared.parsers import data_parser, scalar_parser, array_parser, unwrap_cfg
 from syncopy.shared.computational_routine import ComputationalRoutine
 from syncopy.datatype import SpectralData
+from syncopy.shared.errors import SPYValueError, SPYTypeError
 from syncopy import __dask__
 if __dask__:
     import dask.distributed as dd
+    import dask.array as da
 
 # Module-wide output specs
 complexDTypes = {"complex": np.complex128,
@@ -51,13 +55,46 @@ def connectivityanalysis(data, method='coh', partchannel=None, complex="abs"):
         raise exc
 
     # Ensure a valid computational method was selected
-    avail_methods = ["coh", "wavelet"]
+    avail_methods = ["coh", "corr", "cov", "csd"]
     if method not in avail_methods:
         lgl = "'" + "or '".join(opt + "' " for opt in avail_methods)
         raise SPYValueError(legal=lgl, varname="method", actual=method)
+    
+    # Set power-normalization based on chosen method
+    if method in ["cov", "csd"]:
+        pownorm = False
+    else:
+        pownorm = True
+    
+    # Ensure output selection for complex-valued data makes sense
+    options = complexConversions.keys()
+    if complex not in options:
+        lgl = "'" + "or '".join(opt + "' " for opt in options)
+        raise SPYValueError(legal=lgl, varname="complex", actual=complex)
+        
 
     # Get positional indices of dimensions in `data` relative to class defaults
-    dimord = [SpectralData().dimord.index(dim) for dim in data.dimord]
+    dimord = [data.dimord.index(dim) for dim in SpectralData().dimord]
+    
+    if method in ["coh", "corr", "cov", "csd"]:
+        # check input
+        pass
+    
+    # Construct dict of classes of available methods
+    if method in ["coh", "corr", "cov", "csd"]:
+        connMethod = ConnectivityCorr(dimord, **mth_input)
+
+    # Detect if dask client is running to set `parallel` keyword below accordingly
+    try:
+        dd.get_client()
+        use_dask = True
+    except ValueError:
+        use_dask = False
+
+    # Perform actual computation
+    connMethod.initialize(data)
+    connMethod.compute(data, out, parallel=use_dask, log_dict=log_dct)
+    
 
 def corr(trl_dat, dimord, pownorm=True, complex="abs",
          noCompute=False, chunkShape=None, inMemory=True):
@@ -69,40 +106,86 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
                 requested).
     """
     
+    # Determine dimensional order of input and (if necessary) re-arrange shape-tuple
+    # of `trl_dat` to be able to identify taper-, frequency-, and channel-counts
     if dimord != list(range(len(dimord))):
         shp = tuple([trl_dat.shape[dim] for dim in dimord])
-        reorder = True
     else:
         shp = trl_dat.shape
-        reorder = False
     
-    (_, nTaper, nFreq, nChannels) = shp
-    outShape = (1, 1, nChannels, nChannels, nFreq)
-    
+    # Set expected shape of output and get outta here if we're in the dry-run phase 
+    (_, nTaper, nFreq, nChannel) = shp
+    outShape = (1, nFreq, nChannel, nChannel)
+    outdtype = complexDTypes[complex]
     if noCompute:
-        return outShape, complexDTypes[complex]
-    
-    if inMemory:
-    
-        if reorder:
-            dat = np.moveaxis(trl_dat, dimord, list(range(len(dimord))))
-        else:
-            dat = trl_dat
+        return outShape, outdtype
+
+    # See if we can parallelize across frequencies    
+    try:
+        dd.get_client()
+        parallel = True
+    except ValueError:
+        parallel = False
         
-        conn = np.full(chunkShape, np.nan, dtype=complexDTypes[complex])
+    # Get index of frequency dimension in input
+    freqidx = dimord[SpectralData().dimord.index("freq")] 
+        
+    if parallel:
+        
+        # Create a dask array chunked by frequency and map each taper-channel
+        # block onto `_corr` to compute channel x channel coherence/covariance
+        chunks = list(trl_dat.shape)
+        chunks[freqidx] = 1
+        dat = da.from_array(trl_dat, chunks=tuple(chunks))
+        
+        conn = dat.map_blocks(_corr, nChannel, nTaper, pownorm, 
+                              dtype=outdtype, 
+                              chunks=(1, 1, nChannel, nChannel))
+        conn = conn.reshape(1, nFreq, nChannel, nChannel)
+        
+        # Stacking gymnastics in case trials have different lengths (i.e., frequency-counts)
+        if nFreq < outShape[1]:
+            conn = da.hstack([conn, 
+                              da.zeros((1, outShape[1] - nFreq, nChannel, nChannel), 
+                                       dtype=conn.dtype)])
+            
+    else:
+
+        # If trials don't fit into memory, `trl_dat` is already an HDF5 dataset -
+        # create a new HDF5 file parallel to `trl_dat`'s parent file and write results
+        # directly to it - flush after each frequency pass to not overflow memory
+        idx = [slice(None)] * len(dimord)
+        if inMemory:
+            conn = np.full(chunkShape, np.nan, dtype=outdtype)
+        else:
+            h5f = h5py.File(trl_dat.file.filename.replace(".h5", "_result.h5"))
+            conn = h5f.create_dataset("trl", shape=outShape, dtype=outdtype)
+        
         for nf in range(nFreq):
-            tmp = np.dot(np.squeeze(dat[:, :, nf, :]), np.squeeze(dat[:, :, nf, :]).T)/nTaper
+            idx[freqidx] = nf
+            dat = np.squeeze(trl_dat[idx])
+            tmp = np.dot(dat.reshape(nChannel, nTaper), dat.reshape(nTaper, nChannel))/nTaper
             if pownorm:
                 tdg = np.diag(tmp)        
-                tmp /= np.sqrt(np.repeat(tdg.rehape(-1, 1), axis=1, repeats=nChannels) *\
-                            np.repeat(tdg.rehape(1, -1), axis=0, repeats=nChannels))
-            conn[:, :, :, :, nf] = complexConversions[complex](tmp)
-        
-        return conn
+                tmp /= np.sqrt(np.repeat(tdg.reshape(-1, 1), axis=1, repeats=nChannel) *
+                               np.repeat(tdg.reshape(1, -1), axis=0, repeats=nChannel))
+            conn[:, nf, :, :] = complexConversions[complex](tmp)
+            if not inMemory:
+                conn.flush()
+                dat.flush()
+                
+    return conn
+
     
-    else:
-        pass
+def _corr(blk, nChannel, nTaper, pownorm):
     
+    tmp = da.dot(da.squeeze(blk).reshape(nChannel, nTaper), 
+                 da.squeeze(blk).reshape(nTaper, nChannel))/nTaper
+    if pownorm:
+        tdg = da.diag(tmp)        
+        tmp /= da.sqrt(da.repeat(tdg.reshape(-1, 1), axis=1, repeats=nChannel) *
+                       da.repeat(tdg.reshape(1, -1), axis=0, repeats=nChannel))
+    return complexConversions[complex](tmp).reshape(1, 1, nChannel, nChannel)
 
 
 class ConnectivityCorr(ComputationalRoutine):

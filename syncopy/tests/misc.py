@@ -57,14 +57,14 @@ def is_slurm_node():
         return False
 
     
-def generate_artifical_data(nTrials=2, nChannels=2, equidistant=True,
+def generate_artifical_data(nTrials=2, nChannels=2, samplerate=1000, equidistant=True,
                             overlapping=False, inmemory=True, dimord="default"):
     """
     Populate `AnalogData` object w/ artificial signal
     """
 
     # Create dummy 1d signal that will be blown up to fill channels later
-    dt = 0.001
+    dt = 1/samplerate
     t = np.arange(0, 3, dt, dtype="float32") - 1.0
     sig = np.cos(2 * np.pi * (7 * (np.heaviside(t, 1) * t - 1) + 10) * t)
 
@@ -79,7 +79,7 @@ def generate_artifical_data(nTrials=2, nChannels=2, equidistant=True,
 
     # Either construct the full data array in memory using tiling or create
     # an HDF5 container in `__storage__` and fill it trial-by-trial
-    out = spy.AnalogData(samplerate=1/dt, dimord=dimord)
+    out = spy.AnalogData(samplerate=samplerate, dimord=dimord)
     if inmemory:
         idx[timeAxis] = nTrials 
         sig = np.tile(sig, idx)

@@ -24,7 +24,7 @@ import syncopy as spy
 # Import artificial data generator
 from syncopy.tests.misc import generate_artifical_data
 
-# sys.exit()
+sys.exit()
 
 if __name__ == "__main__":
 

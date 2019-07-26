@@ -4,7 +4,7 @@
 # 
 # Created: 2019-05-13 09:18:55
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-25 16:51:10>
+# Last modification time: <2019-07-26 16:01:45>
 
 # Builtin/3rd party package imports
 import os
@@ -129,6 +129,7 @@ class ComputationalRoutine(ABC):
         self.dsetname = None
         self.datamode = None
         self.sleeptime = 0.1
+        self.inMemory = True
 
     def initialize(self, data):
         """
@@ -301,10 +302,14 @@ class ComputationalRoutine(ABC):
                 wrk_size = max(wrkr.memory_limit for wrkr in client.cluster.workers)
             if trl_size >= mem_thresh * wrk_size:
                 trl_size /= 1024**3
-                wrk_size /= 1024**3
+                wrk_size *= mem_thresh/1024**3
+                # msg = "Single-trial result sizes ({0:2.2f} GB) larger than available " +\
+                #       "worker memory ({1:2.2f} GB) currently not supported"
+                # raise NotImplementedError(msg.format(trl_size, wrk_size))
                 msg = "Single-trial result sizes ({0:2.2f} GB) larger than available " +\
-                      "worker memory ({1:2.2f} GB) currently not supported"
-                raise NotImplementedError(msg.format(trl_size, wrk_size))
+                      "worker memory ({1:2.2f} GB) - caching trials from disk"
+                print("Syncopy compute_parallel: " + msg)
+                self.inMemory = False
 
             # In some cases distributed dask workers suffer from spontaneous
             # dementia and forget the `sys.path` of their parent process. Fun!
@@ -453,7 +458,8 @@ class ComputationalRoutine(ABC):
                                     data.filename,
                                     data.dimord,
                                     data.sampleinfo,
-                                    data.hdr)
+                                    hdr=data.hdr,
+                                    inMemory=self.inMemory)
                          for trialno in range(len(data.trials))]
 
             # Stack trials along new (3rd) axis inserted on the left
@@ -781,8 +787,8 @@ class ComputationalRoutine(ABC):
         # Save data and its original location within the array
         fname = os.path.join(vdsdir, "{0:d}.h5".format(cnt))
         with h5py.File(fname, "w") as h5f:
-            h5f.create_dataset('chk', data=chk)
-            h5f.create_dataset('idx', data=idx)
+            h5f.create_dataset("chk", data=chk)
+            h5f.create_dataset("idx", data=idx)
             h5f.flush()
 
         return (cnt,) * nchk

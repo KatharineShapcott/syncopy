@@ -4,13 +4,14 @@
 # 
 # Created: 2019-02-05 13:12:58
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-24 12:11:33>
+# Last modification time: <2019-07-26 14:49:24>
 
 # Builtin/3rd party package imports
 import os
 import json
 import h5py
 import sys
+import shutil
 import numpy as np
 from collections import OrderedDict
 from hashlib import blake2b
@@ -213,11 +214,12 @@ def save(out, container=None, tag=None, filename=None, overwrite=False, memuse=1
             n_blocks = [nrow] * int(out.data.shape[0] // nrow) + [rem] * int(rem > 0)
 
             # Write data block-wise to dataset (use `clear` to wipe blocks of
-            # mem-maps from memory)
+            # data from memory)
             dat = h5f.create_dataset(out.__class__.__name__,
                                     dtype=out.data.dtype, shape=out.data.shape)
             for m, M in enumerate(n_blocks):
                 dat[m * nrow: m * nrow + M, :] = out.data[m * nrow: m * nrow + M, :]
+                dat.flush()
                 out.clear()
         else:
             dat = h5f.create_dataset(out.__class__.__name__, data=out.data)
@@ -290,6 +292,7 @@ def save(out, container=None, tag=None, filename=None, overwrite=False, memuse=1
         if __storage__ in out.filename:
             out.data.file.close()
             os.unlink(out.filename)
+            shutil.rmtree(os.path.splitext(out.filename)[0], ignore_errors=True)
         out.data = dataFile
 
     # Compute checksum and finally write JSON (automatically overwrites existing)

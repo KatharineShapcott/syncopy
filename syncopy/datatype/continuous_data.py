@@ -4,13 +4,14 @@
 # 
 # Created: 2019-03-20 11:11:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-25 17:14:41>
+# Last modification time: <2019-07-26 15:49:57>
 """Uniformly sampled (continuous data).
 
 This module holds classes to represent data with a uniformly sampled time axis.
 
 """
 # Builtin/3rd party package imports
+import os
 import h5py
 import shutil
 import inspect
@@ -97,7 +98,7 @@ class ContinuousData(BaseData, ABC):
 
     # Helper function that reads a single trial into memory
     @staticmethod
-    def _copy_trial(trialno, filename, dimord, sampleinfo, hdr):
+    def _copy_trial(trialno, filename, dimord, sampleinfo, hdr=None, inMemory=True):
         idx = [slice(None)] * len(dimord)
         idx[dimord.index("time")] = slice(int(sampleinfo[trialno, 0]), int(sampleinfo[trialno, 1]))
         idx = tuple(idx)
@@ -109,10 +110,27 @@ class ContinuousData(BaseData, ABC):
                     cnt = [h5keys.count(dclass) for dclass in spy.datatype.__all__
                            if not inspect.isfunction(getattr(spy.datatype, dclass))]
                     if len(h5keys) == 1:
-                        arr = h5f[h5keys[0]][idx]
+                        dset = h5f[h5keys[0]] 
                     else:
-                        arr = h5f[spy.datatype.__all__[cnt.index(1)]][idx]
-                        # FIXME: if is_virtual just return the virtual source!
+                        dset = h5f[spy.datatype.__all__[cnt.index(1)]]
+                    if inMemory:
+                        return dset[idx]
+                    else:
+                        if dset.is_virtual and __storage__ in filename:
+                            src = os.path.join(os.path.splitext(filename)[0], 
+                                               "{0:d}.h5".format(trialno))
+                            return h5py.File(src, "r")["chk"]
+                        else:
+                            hdfdir = os.path.splitext(AnalogData()._gen_filename())[0]
+                            os.makedirs(hdfdir,exist_ok=True)
+                            tgt = h5py.File(os.path.join(hdfdir, "{0:d}.h5".format(trialno)), "w")
+                            try:
+                                dset = tgt.create_dataset("chk", data=dset[idx])
+                            except MemoryError:
+                                raise NotImplementedError("Blockwise trial-copying not implemented yet. ")
+                            except Exception as exc:
+                                raise exc
+                            return dset
             except:
                 try:
                     arr = np.array(open_memmap(filename, mode="c")[idx])

@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-22 09:07:47
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-24 17:26:20>
+# Last modification time: <2019-07-26 17:08:20>
 
 # Builtin/3rd party package imports
 import sys
@@ -211,6 +211,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
                 raise exc
 
     # Warn the user in case other method-specifc options are set
+    # FIXME: turn this into a shared method starting here <<<<<<<<<<<<<<<<<<<<<<<<
     other = list(avail_methods)
     other.pop(other.index(method))
     mth_defaults = {}
@@ -235,6 +236,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
     log_kws[log_kws.index("output_fmt")] = "output"
     for key in log_kws:
         log_dct[key] = lcls[key]
+    # FIXME: this too <<<<<<<<<<<<<<<<<<<<<<<<
 
     # If provided, make sure output object is appropriate
     if out is not None:
@@ -258,6 +260,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
     kws.append("keeptrials")
     for kw in kws:
         mth_input[kw] = lcls[kw]
+    # FIXME: and this too <<<<<<<<<<<<<<<<<<<<<<<<
 
     # Construct dict of classes of available methods
     methods = {
@@ -265,7 +268,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
         "wavelet": WaveletTransform(1/data.samplerate, timeAxis, foi, **mth_input)
     }
 
-    # Detect if dask client is running and set `parallel` keyword accordingly
+    # Detect if dask client is running to set `parallel` keyword below accordingly
     try:
         dd.get_client()
         use_dask = True
