@@ -4,7 +4,7 @@
 # 
 # Created: 2019-03-20 11:11:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-06 09:56:09>
+# Last modification time: <2019-08-06 14:35:17>
 """Uniformly sampled (continuous data).
 
 This module holds classes to represent data with a uniformly sampled time axis.
@@ -154,11 +154,8 @@ class ContinuousData(BaseData, ABC):
         return self._data[tuple(idx)]
     
     def _preview_trial(self, trialno):
-        shp = []
-        for dim in self.data.shape:
-            shp.append(slice(0, dim))
-        shp[self.dimord.index("time")] = slice(int(self.sampleinfo[trialno, 0]), 
-                                               int(self.sampleinfo[trialno, 1]))
+        shp = list(self.data.shape)
+        shp[self.dimord.index("time")] = int(self.sampleinfo[trialno, 1]) - int(self.sampleinfo[trialno, 0])
         return FauxTrial(shp, self.data.dtype)
         
     # Make instantiation persistent in all subclasses

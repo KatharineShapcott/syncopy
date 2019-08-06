@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-07 09:22:33
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-26 18:16:48>
+# Last modification time: <2019-08-06 15:00:52>
 
 # Builtin/3rd party package imports
 import numpy as np
@@ -1003,3 +1003,17 @@ class FauxTrial():
     def __init__(self, shape, dtype):
         self.shape = tuple(shape)
         self.dtype = dtype
+        
+    def __str__(self):
+        msg = "Trial placeholder of shape {} and datatype {}"
+        return msg.format(str(self.shape), str(self.dtype))
+
+    def __repr__(self):
+        return self.__str__()
+
+    def squeeze(self):
+        shp = list(self.shape)
+        while 1 in shp:
+            shp.remove(1)
+        return FauxTrial(shp, self.dtype)
+    

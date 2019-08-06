@@ -4,7 +4,7 @@
 # 
 # Created: 2019-05-13 09:18:55
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-26 16:01:45>
+# Last modification time: <2019-08-06 15:04:17>
 
 # Builtin/3rd party package imports
 import os
@@ -166,13 +166,12 @@ class ComputationalRoutine(ABC):
         # For trials of unequal length, compute output chunk-shape individually
         # to identify varying dimension(s). The aggregate shape is computed
         # as max across all chunks
-        if np.any(data._preview_trial(0).shape != data._preview_trial(tk).shape 
-                  for tk in range(data._sampleinfo.shape[0])):
-        # if np.any([data._shapes[0] != sh for sh in data._shapes]):
+        if np.any([data._preview_trial(0).shape != data._preview_trial(tk).shape 
+                   for tk in range(data._sampleinfo.shape[0])]):
             chunkShape = list(chunkShape)
             chk_list = [chunkShape]
             for tk in range(1, len(data.trials)):
-                chk_list.append(list(self.computeFunction(data.trials[tk],
+                chk_list.append(list(self.computeFunction(data._preview_trial(tk),
                                                           *self.argv,
                                                           **dryRunKwargs)[0]))
             chk_arr = np.array(chk_list)
@@ -448,10 +447,9 @@ class ComputationalRoutine(ABC):
         data.mode = "r"
 
         # Depending on equidistance of trials use dask arrays directly...
-        # if np.all([data._shapes[0] == sh for sh in data._shapes]):
-        if np.all(data._preview_trial(0).shape == data._preview_trial(tk).shape 
-                  for tk in range(data._sampleinfo.shape[0])):
-
+        if np.all([data._preview_trial(tk).shape == data._preview_trial(0).shape 
+                   for tk in range(data._sampleinfo.shape[0])]):
+            
             # Point to trials on disk by using delayed **static** method calls
             lazy_trial = dask.delayed(data._copy_trial, traverse=False)
             lazy_trls = [lazy_trial(trialno,
@@ -489,8 +487,6 @@ class ComputationalRoutine(ABC):
             
             # Re-arrange dimensional order
             result = result.reshape(self.outputShape)
-
-            
 
             # If wanted, average across trials (AnalogData are the only objects
             # that do not stack trials along a distinct time dimension...)

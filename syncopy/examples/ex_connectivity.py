@@ -4,7 +4,7 @@
 # 
 # Created: 2019-08-06 10:00:25
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-06 11:03:51>
+# Last modification time: <2019-08-06 13:51:43>
 
 # Builtin/3rd party package imports
 import dask.distributed as dd
@@ -34,6 +34,7 @@ if __name__ == "__main__":
     cfg.method = "mtmfft"
     cfg.taper = "dpss"
     cfg.tapsmofrq = 9.3
+    cfg.output = "abs"
     
     # Perform spectral analysis
     spec = spy.freqanalysis(artdata, cfg)

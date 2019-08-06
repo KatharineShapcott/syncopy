@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-22 09:07:47
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-26 17:08:20>
+# Last modification time: <2019-08-06 14:58:11>
 
 # Builtin/3rd party package imports
 import sys
@@ -21,7 +21,8 @@ from copy import copy
 from numbers import Number
 
 # Local imports
-from syncopy.shared.parsers import data_parser, scalar_parser, array_parser, unwrap_cfg 
+from syncopy.shared.parsers import (data_parser, scalar_parser, array_parser, 
+                                    method_keyword_parser, unwrap_cfg)
 from syncopy.shared import get_defaults
 from syncopy.shared.computational_routine import ComputationalRoutine
 from syncopy.datatype import SpectralData, padding
@@ -69,7 +70,9 @@ def freqanalysis(data, method='mtmfft', output='fourier',
     # Get everything of interest in local namespace
     defaults = get_defaults(freqanalysis)
     lcls = locals()
-    glbls = globals()
+    
+    # List to keep track of keywords that were `None` in call but get overwritten
+    NoneVals = []
 
     # Ensure a valid computational method was selected
     avail_methods = ["mtmfft", "wavelet"]
@@ -85,6 +88,8 @@ def freqanalysis(data, method='mtmfft', output='fourier',
 
     # Patch `output` keyword to not collide w/dask's ``blockwise`` output
     defaults["output_fmt"] = defaults.pop("output")
+    
+    # We need to define `output_fmt` for `locals()` call in `method_keyword_parser`!
     output_fmt = output
 
     # Parse all Boolean keyword arguments
@@ -128,6 +133,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
         foi = freqs[np.unique(np.searchsorted(freqs, foi, side="right") - 1)]
     else:
         foi = freqs
+        NoneVals.append("foi")
 
     # FIXME: implement detrending
     if polyremoval is True or polyorder is not None:
@@ -167,6 +173,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
             if tapsmofrq is None:
                 foimax = foi.max()
                 tapsmofrq = (foimax * 2**(3/4/2) - foimax * 2**(-3/4/2)) / 2
+                NoneVals.append("tapsmofrq")
             else:
                 try:
                     scalar_parser(tapsmofrq, varname="tapsmofrq", lims=[1, np.inf])
@@ -210,33 +217,52 @@ def freqanalysis(data, method='mtmfft', output='fourier',
             except Exception as exc:
                 raise exc
 
-    # Warn the user in case other method-specifc options are set
-    # FIXME: turn this into a shared method starting here <<<<<<<<<<<<<<<<<<<<<<<<
-    other = list(avail_methods)
-    other.pop(other.index(method))
-    mth_defaults = {}
-    for mth_str in other:
-        mth_defaults.update(get_defaults(glbls[mth_str]))
-    kws = list(get_defaults(glbls[method]).keys())
-    distinct_kws = set(defaults.keys()).difference(kws)
-    other_opts = distinct_kws.intersection(mth_defaults.keys()) 
-    for key in other_opts:
-        m_default = mth_defaults[key]
-        if callable(m_default):
-            m_default = m_default.__name__
-        if lcls[key] != m_default:
-            wrng = "<freqanalysis> WARNING: `{kw:s}` keyword has no effect in " +\
-                   "chosen method {m:s}"
-            print(wrng.format(kw=key, m=method))
+    # Construct method-specific dict of input keywords and a dict for logging
+    mth_input, log_dct = method_keyword_parser(method, list(avail_methods))
+    mth_input["keeptrials"] = keeptrials
+    for key in NoneVals:
+        log_dct[key] = None
 
-    # Construct dict of "global" keywords sans alien method keywords for logging
-    log_dct = {}
-    log_kws = set(defaults.keys()).difference(other_opts)
-    log_kws = [kw for kw in log_kws if kw != "out"]
-    log_kws[log_kws.index("output_fmt")] = "output"
-    for key in log_kws:
-        log_dct[key] = lcls[key]
-    # FIXME: this too <<<<<<<<<<<<<<<<<<<<<<<<
+    # import ipdb; ipdb.set_trace()
+    
+    # # Reset "output_fmt" to "output" in the logging dict to be consistent w/input 
+    # log_kws[log_kws.index("output_fmt")] = "output"
+    
+    # # Prepare dict of optional keywords for computational class constructor
+    # # (update `lcls` to reflect changes in method-specifc options)
+    # lcls = locals()
+    # mth_input = {}
+    # kws.append("keeptrials")
+    # for kw in kws:
+    #     mth_input[kw] = lcls[kw]
+    
+    # # FIXME: turn this into a shared method starting here <<<<<<<<<<<<<<<<<<<<<<<<
+    # other = list(avail_methods)
+    # other.pop(other.index(method))
+    # mth_defaults = {}
+    # for mth_str in other:
+    #     mth_defaults.update(get_defaults(glbls[mth_str]))
+    # kws = list(get_defaults(glbls[method]).keys())
+    # distinct_kws = set(defaults.keys()).difference(kws)
+    # other_opts = distinct_kws.intersection(mth_defaults.keys()) 
+    # for key in other_opts:
+    #     m_default = mth_defaults[key]
+    #     if callable(m_default):
+    #         m_default = m_default.__name__
+    #     if lcls[key] != m_default:
+    #         wrng = "<freqanalysis> WARNING: `{kw:s}` keyword has no effect in " +\
+    #                "chosen method {m:s}"
+    #         print(wrng.format(kw=key, m=method))
+            
+    
+    # # Construct dict of "global" keywords sans alien method keywords for logging
+    # log_dct = {}
+    # log_kws = set(defaults.keys()).difference(other_opts)
+    # log_kws = [kw for kw in log_kws if kw != "out"]
+    # log_kws[log_kws.index("output_fmt")] = "output"
+    # for key in log_kws:
+    #     log_dct[key] = lcls[key]
+    # # FIXME: this too <<<<<<<<<<<<<<<<<<<<<<<<
 
     # If provided, make sure output object is appropriate
     if out is not None:
@@ -251,17 +277,6 @@ def freqanalysis(data, method='mtmfft', output='fourier',
         out = SpectralData()
         new_out = True
 
-    # Prepare dict of optional keywords for computational class constructor
-    # (update `lcls` to reflect changes in method-specifc options)
-    lcls = locals()
-    mth_input = {}
-    kws.remove("noCompute")
-    kws.remove("chunkShape")
-    kws.append("keeptrials")
-    for kw in kws:
-        mth_input[kw] = lcls[kw]
-    # FIXME: and this too <<<<<<<<<<<<<<<<<<<<<<<<
-
     # Construct dict of classes of available methods
     methods = {
         "mtmfft": MultiTaperFFT(1/data.samplerate, timeAxis, **mth_input),
@@ -269,11 +284,13 @@ def freqanalysis(data, method='mtmfft', output='fourier',
     }
 
     # Detect if dask client is running to set `parallel` keyword below accordingly
-    try:
-        dd.get_client()
-        use_dask = True
-    except ValueError:
-        use_dask = False
+    use_dask = False
+    if __dask__:
+        try:
+            dd.get_client()
+            use_dask = True
+        except ValueError:
+            use_dask = False
 
     # Perform actual computation
     specestMethod = methods[method]
@@ -296,6 +313,8 @@ def mtmfft(trl_dat, dt, timeAxis,
         dat = trl_dat.T       # does not copy but creates view of `trl_dat`
     else:
         dat = trl_dat
+    if not isinstance(dat, np.ndarray):
+        import pdb; pdb.set_trace()
     dat = dat.squeeze()
 
     # Padding (updates no. of samples)
