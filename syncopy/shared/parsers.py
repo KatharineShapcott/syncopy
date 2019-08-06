@@ -4,13 +4,14 @@
 # 
 # Created: 2019-01-08 09:58:11
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-24 12:52:30>
+# Last modification time: <2019-08-06 16:33:31>
 
 # Builtin/3rd party package imports
 import os
-import numpy as np
+import sys
 import numbers
 import functools
+import numpy as np
 from inspect import signature
 
 # Local imports
@@ -477,22 +478,6 @@ def data_parser(data, varname="", dataclass=None, writable=None, empty=None, dim
     return
 
 
-def json_parser(json_dct, wanted_dct):
-    """
-    Docstring coming soon(ish)
-    """
-
-    if not set(wanted_dct.keys()).issubset(json_dct.keys()):
-        legal = "mandatory fields " + "".join(key + ", " for key in wanted_dct.keys())[:-2]
-        raise SPYValueError(legal=legal, varname="JSON")
-    
-    for key, tp in wanted_dct.items():
-        if not isinstance(json_dct[key], tp):
-            raise SPYTypeError(json_dct[key], varname="JSON: {}".format(key),
-                               expected=tp)
-    return
-
-
 def get_defaults(obj):
     """
     Parse input arguments of `obj` and return dictionary
@@ -511,9 +496,9 @@ def get_defaults(obj):
 
     Examples
     --------
-    To see the default input arguments of :meth:`syncopy.specest.mtmfft` use
+    To see the default input arguments of :func:`syncopy.freqanalysis` use
     
-    >>> spy.get_defaults(spy.mtmfft)
+    >>> spy.get_defaults(spy.freqanalysis)
     """
 
     if not callable(obj):
@@ -741,3 +726,91 @@ def unwrap_cfg(func):
         return func(*args, **kwargs)
 
     return wrapper_cfg
+
+
+def method_keyword_parser(method, avail_methods):
+    """
+    Verify consistency of user-provided method-specific keywords in compute kernels
+    
+    Parameters
+    ----------
+    method : str
+        Name of selected method
+    avail_method : list
+        List of method names (str) available in module
+        
+    Returns
+    -------
+    kws_dct : dict
+        Dictionary of user-provided/default keyword-value pairs that can be 
+        directly used to call `method`
+    log_kws : dict
+        Dictionary of keyword-value pairs specifically formatted for Syncopy
+        object logs (e.g., a callable object in `kws_dct` is replaced by its
+        name in `log_kws`). 
+        
+    Notes
+    -----
+    This parser accesses its caller's local and global namespace to verify the
+    integrity of provided vs. default parameter values. Therefore, the output
+    of this routine may change depending on when it is invoked in the calling 
+    method (for instance, before/after user-provided keywords are overwritten). 
+    
+    Examples
+    --------
+    For a relatively simple usage example of this parser, consider the body 
+    of :func:`syncopy.freqanalysis`. 
+    """
+    
+    # Identify caller and vars in its local and global namespace
+    caller = sys._getframe().f_back
+    lcls = caller.f_locals
+    glbls = caller.f_globals
+    callerName = caller.f_code.co_name
+    
+    # Get default keyword values of caller
+    defaults = get_defaults(glbls[callerName])
+
+    # If necessary, remove chosen method from list of available methods (do this
+    # within a local copy to not mess w/original list in caller's workspace)
+    other = list(avail_methods)
+    if method in other:
+        other.remove(method)    
+    
+    # Construct keyword list specific to chosen method (`kws`) and check if keywords 
+    # unique to other available methods (`other_opts`) were set as well (if yes,
+    # print warning message); also only check for method names, not objects (`taper="hann"`
+    # is considered identical to `taper=<function hann at 0x7f3cf470d620>`)
+    mth_defaults = {}
+    for mth_str in other:
+        mth_defaults.update(get_defaults(glbls[mth_str]))
+    kws = list(get_defaults(glbls[method]).keys())
+    distinct_kws = set(defaults.keys()).difference(kws)
+    other_opts = distinct_kws.intersection(mth_defaults.keys()) 
+    for key in other_opts:
+        m_default = mth_defaults[key]
+        if callable(m_default):
+            m_default = m_default.__name__
+        if lcls[key] != m_default:
+            wrng = "<{calling:s}> WARNING: `{kw:s}` keyword has no effect in " +\
+                   "chosen method {m:s}"
+            print(wrng.format(calling=callerName, kw=key, m=method))
+    kws.remove("noCompute")
+    kws.remove("chunkShape")
+    
+    # Construct readily usable dictionary of method-specific keywords
+    kws_dct = {}
+    for kw in kws:
+        kws_dct[kw] = lcls[kw]
+
+    # Construct dict of "global" keywords sans alien method keywords for logging
+    log_dct = {}
+    log_kws = set(defaults.keys()).difference(other_opts)
+    log_kws = [kw for kw in log_kws if kw != "out"]
+    for key in log_kws:
+        value = lcls[key]
+        if callable(value):
+            value = value.__name__
+        log_dct[key] = value
+    
+    return kws_dct, log_dct
