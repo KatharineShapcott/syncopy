@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-22 09:07:47
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-06 14:58:11>
+# Last modification time: <2019-08-06 16:30:17>
 
 # Builtin/3rd party package imports
 import sys
@@ -70,10 +70,10 @@ def freqanalysis(data, method='mtmfft', output='fourier',
     # Get everything of interest in local namespace
     defaults = get_defaults(freqanalysis)
     lcls = locals()
-    
+
     # List to keep track of keywords that were `None` in call but get overwritten
     NoneVals = []
-
+    
     # Ensure a valid computational method was selected
     avail_methods = ["mtmfft", "wavelet"]
     if method not in avail_methods:
@@ -222,48 +222,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
     mth_input["keeptrials"] = keeptrials
     for key in NoneVals:
         log_dct[key] = None
-
-    # import ipdb; ipdb.set_trace()
-    
-    # # Reset "output_fmt" to "output" in the logging dict to be consistent w/input 
-    # log_kws[log_kws.index("output_fmt")] = "output"
-    
-    # # Prepare dict of optional keywords for computational class constructor
-    # # (update `lcls` to reflect changes in method-specifc options)
-    # lcls = locals()
-    # mth_input = {}
-    # kws.append("keeptrials")
-    # for kw in kws:
-    #     mth_input[kw] = lcls[kw]
-    
-    # # FIXME: turn this into a shared method starting here <<<<<<<<<<<<<<<<<<<<<<<<
-    # other = list(avail_methods)
-    # other.pop(other.index(method))
-    # mth_defaults = {}
-    # for mth_str in other:
-    #     mth_defaults.update(get_defaults(glbls[mth_str]))
-    # kws = list(get_defaults(glbls[method]).keys())
-    # distinct_kws = set(defaults.keys()).difference(kws)
-    # other_opts = distinct_kws.intersection(mth_defaults.keys()) 
-    # for key in other_opts:
-    #     m_default = mth_defaults[key]
-    #     if callable(m_default):
-    #         m_default = m_default.__name__
-    #     if lcls[key] != m_default:
-    #         wrng = "<freqanalysis> WARNING: `{kw:s}` keyword has no effect in " +\
-    #                "chosen method {m:s}"
-    #         print(wrng.format(kw=key, m=method))
-            
-    
-    # # Construct dict of "global" keywords sans alien method keywords for logging
-    # log_dct = {}
-    # log_kws = set(defaults.keys()).difference(other_opts)
-    # log_kws = [kw for kw in log_kws if kw != "out"]
-    # log_kws[log_kws.index("output_fmt")] = "output"
-    # for key in log_kws:
-    #     log_dct[key] = lcls[key]
-    # # FIXME: this too <<<<<<<<<<<<<<<<<<<<<<<<
-
+        
     # If provided, make sure output object is appropriate
     if out is not None:
         try:
@@ -283,7 +242,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
         "wavelet": WaveletTransform(1/data.samplerate, timeAxis, foi, **mth_input)
     }
 
-    # Detect if dask client is running to set `parallel` keyword below accordingly
+    # Detect if dask client is running and set `parallel` keyword accordingly
     use_dask = False
     if __dask__:
         try:

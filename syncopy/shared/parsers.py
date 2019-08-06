@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-08 09:58:11
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-06 13:35:52>
+# Last modification time: <2019-08-06 16:33:31>
 
 # Builtin/3rd party package imports
 import os
@@ -478,22 +478,6 @@ def data_parser(data, varname="", dataclass=None, writable=None, empty=None, dim
     return
 
 
-# def json_parser(json_dct, wanted_dct):
-#     """
-#     Docstring coming soon(ish)
-#     """
-
-#     if not set(wanted_dct.keys()).issubset(json_dct.keys()):
-#         legal = "mandatory fields " + "".join(key + ", " for key in wanted_dct.keys())[:-2]
-#         raise SPYValueError(legal=legal, varname="JSON")
-    
-#     for key, tp in wanted_dct.items():
-#         if not isinstance(json_dct[key], tp):
-#             raise SPYTypeError(json_dct[key], varname="JSON: {}".format(key),
-#                                expected=tp)
-#     return
-
-
 def get_defaults(obj):
     """
     Parse input arguments of `obj` and return dictionary
@@ -512,9 +496,9 @@ def get_defaults(obj):
 
     Examples
     --------
-    To see the default input arguments of :meth:`syncopy.specest.mtmfft` use
+    To see the default input arguments of :func:`syncopy.freqanalysis` use
     
-    >>> spy.get_defaults(spy.mtmfft)
+    >>> spy.get_defaults(spy.freqanalysis)
     """
 
     if not callable(obj):
@@ -746,7 +730,36 @@ def unwrap_cfg(func):
 
 def method_keyword_parser(method, avail_methods):
     """
-    Coming soon...
+    Verify consistency of user-provided method-specific keywords in compute kernels
+    
+    Parameters
+    ----------
+    method : str
+        Name of selected method
+    avail_method : list
+        List of method names (str) available in module
+        
+    Returns
+    -------
+    kws_dct : dict
+        Dictionary of user-provided/default keyword-value pairs that can be 
+        directly used to call `method`
+    log_kws : dict
+        Dictionary of keyword-value pairs specifically formatted for Syncopy
+        object logs (e.g., a callable object in `kws_dct` is replaced by its
+        name in `log_kws`). 
+        
+    Notes
+    -----
+    This parser accesses its caller's local and global namespace to verify the
+    integrity of provided vs. default parameter values. Therefore, the output
+    of this routine may change depending on when it is invoked in the calling 
+    method (for instance, before/after user-provided keywords are overwritten). 
+    
+    Examples
+    --------
+    For a relatively simple usage example of this parser, consider the body 
+    of :func:`syncopy.freqanalysis`. 
     """
     
     # Identify caller and vars in its local and global namespace
@@ -754,7 +767,6 @@ def method_keyword_parser(method, avail_methods):
     lcls = caller.f_locals
     glbls = caller.f_globals
     callerName = caller.f_code.co_name
-    
     
     # Get default keyword values of caller
     defaults = get_defaults(glbls[callerName])
@@ -800,7 +812,5 @@ def method_keyword_parser(method, avail_methods):
         if callable(value):
             value = value.__name__
         log_dct[key] = value
-
-    # import ipdb; ipdb.set_trace()
     
     return kws_dct, log_dct
