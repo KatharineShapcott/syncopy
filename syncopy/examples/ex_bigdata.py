@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # 
-# Example illustrating processing *large* datasets in Syncopy
+# Example illustrating how to process *large* datasets in Syncopy
 # 
 # Created: 2019-07-26 10:20:58
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-26 10:50:32>
+# Last modification time: <2019-08-06 10:42:16>
 
 # Builtin/3rd party package imports
 import dask.distributed as dd
