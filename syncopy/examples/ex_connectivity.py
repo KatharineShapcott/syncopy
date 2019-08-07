@@ -4,7 +4,7 @@
 # 
 # Created: 2019-08-06 10:00:25
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-06 13:51:43>
+# Last modification time: <2019-08-07 09:36:57>
 
 # Builtin/3rd party package imports
 import dask.distributed as dd
@@ -38,6 +38,8 @@ if __name__ == "__main__":
     
     # Perform spectral analysis
     spec = spy.freqanalysis(artdata, cfg)
+    
+    sys.exit()
     
     # Take result of spectral analysis to compute all-to-all coherence
     conn = spy.connectivityanalysis(spec)

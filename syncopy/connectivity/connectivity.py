@@ -4,7 +4,7 @@
 # 
 # Created: 2019-07-24 14:22:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-07-26 17:14:53>
+# Last modification time: <2019-08-07 09:36:28>
 
 # Builtin/3rd party package imports
 import os
@@ -71,13 +71,13 @@ def connectivityanalysis(data, method='coh', partchannel=None, complex="abs"):
     if complex not in options:
         lgl = "'" + "or '".join(opt + "' " for opt in options)
         raise SPYValueError(legal=lgl, varname="complex", actual=complex)
-        
 
     # Get positional indices of dimensions in `data` relative to class defaults
     dimord = [data.dimord.index(dim) for dim in SpectralData().dimord]
     
+    # Parsing of method-specific input parameters
     if method in ["coh", "corr", "cov", "csd"]:
-        # check input
+        # FIXME: check input
         pass
     
     # Construct dict of classes of available methods
@@ -85,11 +85,12 @@ def connectivityanalysis(data, method='coh', partchannel=None, complex="abs"):
         connMethod = ConnectivityCorr(dimord, **mth_input)
 
     # Detect if dask client is running to set `parallel` keyword below accordingly
-    try:
-        dd.get_client()
-        use_dask = True
-    except ValueError:
-        use_dask = False
+    if __dask__:
+        try:
+            dd.get_client()
+            use_dask = True
+        except ValueError:
+            use_dask = False
 
     # Perform actual computation
     connMethod.initialize(data)

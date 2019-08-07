@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-07 09:22:33
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-06 15:00:52>
+# Last modification time: <2019-08-07 11:06:46>
 
 # Builtin/3rd party package imports
 import numpy as np
@@ -333,8 +333,9 @@ class BaseData(ABC):
     @property
     def trials(self):
         """list-like array of trials"""
-        return Indexer(map(self._get_trial, range(self.sampleinfo.shape[0])),
-                       self.sampleinfo.shape[0]) if self.sampleinfo is not None else None
+        return Indexer(map(self._get_trial, range(self.trialinfo.shape[0])),
+                       self.trialinfo.shape[0]) if self.trialinfo is not None else None
+        
     @property
     def trialinfo(self):
         """nTrials x M :class:`numpy.ndarray` with numeric information about each trial
