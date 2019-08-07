@@ -39,7 +39,5 @@ if __name__ == "__main__":
     # Perform spectral analysis
     spec = spy.freqanalysis(artdata, cfg)
     
-    sys.exit()
-    
     # Take result of spectral analysis to compute all-to-all coherence
     conn = spy.connectivityanalysis(spec)

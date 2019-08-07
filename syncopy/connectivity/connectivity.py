@@ -13,9 +13,10 @@ import h5py
 import numpy as np
 
 # Local imports
-from syncopy.shared.parsers import data_parser, scalar_parser, array_parser, unwrap_cfg
+from syncopy.shared.parsers import (data_parser, scalar_parser, array_parser, 
+                                    method_keyword_parser, unwrap_cfg)
 from syncopy.shared.computational_routine import ComputationalRoutine
-from syncopy.datatype import SpectralData
+from syncopy.datatype import SpectralData, ConnectivityData
 from syncopy.shared.errors import SPYValueError, SPYTypeError
 from syncopy import __dask__
 if __dask__:
@@ -42,46 +43,94 @@ __all__ = ["connectivityanalysis"]
 
 
 @unwrap_cfg
-def connectivityanalysis(data, method='coh', partchannel=None, complex="abs"):
+def connectivityanalysis(data, method='coh', partchannel=None, complex="abs", 
+                         removemean=True, bandwidth=None, 
+                         out=None):
     """
     Coming soon...
     """
     
-    # Make sure our one mandatory input object can be processed
-    try:
-        data_parser(data, varname="data", dataclass="SpectralData",
-                    writable=None, empty=False)
-    except Exception as exc:
-        raise exc
-
     # Ensure a valid computational method was selected
     avail_methods = ["coh", "corr", "cov", "csd"]
+    # # FIXME: FT supported methods:
+    # avail_methods = ["amplcorr", "coh", "csd", "dtf", "granger", "pdc", "plv", 
+    #                  "powcorr", "powcorr_ortho", "ppc", "psi", "wpli", "wpli_debiased", 
+    #                  "wppc", "corr"]
     if method not in avail_methods:
         lgl = "'" + "or '".join(opt + "' " for opt in avail_methods)
         raise SPYValueError(legal=lgl, varname="method", actual=method)
     
-    # Set power-normalization based on chosen method
-    if method in ["cov", "csd"]:
-        pownorm = False
+    # Method selection determines validity of input datatype
+    if method in ["corr", "cov"]:
+        if data.__class__.__name__ not in ["AnalogData", "SpectralData"]:
+            msg = "Syncopy AnalogData or SpectralData object"
+            raise SPYTypeError(data, varname="data", expected=msg)
+        dclass = data.__class__.__name__
     else:
-        pownorm = True
-    
+        dclass = "SpectralData"
+    try:
+        data_parser(data, varname="data", dataclass=dclass, writable=None, empty=False)
+    except Exception as exc:
+        raise exc
+        
     # Ensure output selection for complex-valued data makes sense
-    options = complexConversions.keys()
-    if complex not in options:
-        lgl = "'" + "or '".join(opt + "' " for opt in options)
-        raise SPYValueError(legal=lgl, varname="complex", actual=complex)
+    if dclass == "SpectralData":
+        options = complexConversions.keys()
+        if complex not in options:
+            lgl = "'" + "or '".join(opt + "' " for opt in options)
+            raise SPYValueError(legal=lgl, varname="complex", actual=complex)
 
     # Get positional indices of dimensions in `data` relative to class defaults
-    dimord = [data.dimord.index(dim) for dim in SpectralData().dimord]
+    dimord = [data.dimord.index(dim) for dim in data.__class__().dimord]
     
     # Parsing of method-specific input parameters
-    if method in ["coh", "corr", "cov", "csd"]:
-        # FIXME: check input
-        pass
-    
-    # Construct dict of classes of available methods
-    if method in ["coh", "corr", "cov", "csd"]:
+    if method in ["coh", "csd", "plv"]:
+        if partchannel is not None:
+            raise NotImplementedError("Partial coherence not yet implemented")
+            try:
+                array_parser(partchannel, varname="partchannel", ntype="str", 
+                            dims=data.channel.size)
+            except Exception as exc:
+                raise exc
+            if np.any([chan not in data.channel for chan in partchannel]):
+                lgl = "all channels to be partialized out to be present in input object"
+                raise SPYValueError(legal=lgl, varname="partchannel")
+            
+    elif method in ["powcorr", "amplcorr"]:
+        if not isinstance(removemean, bool):
+            raise SPYTypeError(removemean, varname="removemean", expected="bool")
+        
+    elif method == "psi":
+        try:
+            scalar_parser(bandwidth, varname="bandwidth", lims=[0, data.freq.max()/2])
+        except Exception as exc:
+            raise exc
+        
+    # If provided, make sure output object is appropriate
+    if out is not None:
+        try:
+            data_parser(out, varname="out", writable=True, empty=True,
+                        dataclass="ConnectivityData",
+                        dimord=ConnectivityData().dimord)
+        except Exception as exc:
+            raise exc
+        new_out = False
+    else:
+        out = ConnectivityData()
+        new_out = True
+        
+    # Select appropriate compute kernel for requested method
+    avail_kernels = ["corr"]
+    if method in ["coh", "corr", "cov" "csd", "plv", "amplcorr", "powcorr"]:
+        
+        # Set power-normalization based on chosen method
+        if method in ["cov", "csd"]:
+            pownorm = False
+        else:
+            pownorm = True
+            
+        # Construct method-specific dict of input keywords and a dict for logging
+        mth_input, log_dct = method_keyword_parser("corr", avail_kernels)
         connMethod = ConnectivityCorr(dimord, **mth_input)
 
     # Detect if dask client is running to set `parallel` keyword below accordingly
@@ -91,6 +140,8 @@ def connectivityanalysis(data, method='coh', partchannel=None, complex="abs"):
             use_dask = True
         except ValueError:
             use_dask = False
+            
+    import ipdb; ipdb.set_trace()
 
     # Perform actual computation
     connMethod.initialize(data)
@@ -107,17 +158,21 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
                 requested).
     """
     
-    # Determine dimensional order of input and (if necessary) re-arrange shape-tuple
-    # of `trl_dat` to be able to identify taper-, frequency-, and channel-counts
+    # Determine dimensional order of input
     if dimord != list(range(len(dimord))):
         shp = tuple([trl_dat.shape[dim] for dim in dimord])
     else:
         shp = trl_dat.shape
     
     # Set expected shape of output and get outta here if we're in the dry-run phase 
-    (_, nTaper, nFreq, nChannel) = shp
-    outShape = (1, nFreq, nChannel, nChannel)
-    outdtype = complexDTypes[complex]
+    if len(shp) == 4:
+        (_, nTaper, nFreq, nChannel) = shp
+        outShape = (1, nFreq, nChannel, nChannel)
+        outdtype = complexDTypes[complex]
+    else:
+        (_, nChannel) = shp
+        outShape = (1, nChannel, nChannel)
+        outdtype = trl_dat.dtype
     if noCompute:
         return outShape, outdtype
 
@@ -164,7 +219,7 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
         
         for nf in range(nFreq):
             idx[freqidx] = nf
-            dat = np.squeeze(trl_dat[idx])
+            dat = np.squeeze(trl_dat[tuple(idx)])
             tmp = np.dot(dat.reshape(nChannel, nTaper), dat.reshape(nTaper, nChannel))/nTaper
             if pownorm:
                 tdg = np.diag(tmp)        

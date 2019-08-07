@@ -224,6 +224,11 @@ class BaseData(ABC):
         # Canonical way to perform initial allocation of dimensional properties 
         # (`self._channel = None`, `self._freq = None` etc.)            
         self._dimord = list(dims)
+        if dims.count("channel") == 2:  # account for `ConnectivityData` objects
+            dims.remove("channel")
+            self._channel1 = None
+            dims.remove("channel")
+            self._channel2 = None
         for dim in [dlabel for dlabel in dims if dlabel != "time"]:
             setattr(self, "_" + dim, None)
             

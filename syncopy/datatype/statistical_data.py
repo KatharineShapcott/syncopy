@@ -42,7 +42,7 @@ class ConnectivityData(BaseData, ABC):
     @channel1.setter
     def channel1(self, chan):
         if self.data is None:
-            print("SyNCoPy core - channel: Cannot assign `channels` without data. " +
+            print("SyNCoPy core - channel1: Cannot assign `channels` without data. " +
                   "Please assing data first")
             return
         nchan = self.data.shape[self.dimord.index("channel")]
@@ -60,7 +60,7 @@ class ConnectivityData(BaseData, ABC):
     @channel2.setter
     def channel2(self, chan):
         if self.data is None:
-            print("SyNCoPy core - channel: Cannot assign `channels` without data. " +
+            print("SyNCoPy core - channel2: Cannot assign `channels` without data. " +
                   "Please assing data first")
             return
         dims = [idx for idx, val in enumerate(self.dimord) if val == 'channel']     
@@ -132,7 +132,8 @@ class ConnectivityData(BaseData, ABC):
                  data=None,
                  filename=None,
                  trialdefinition=None,
-                 channel="channel",
+                 channel1="first_channel_dim",
+                 channel2="second_channel_dim",
                  mode="w",
                  dimord=["trial", "freq", "channel", "channel"]):
 
@@ -152,7 +153,8 @@ class ConnectivityData(BaseData, ABC):
         super().__init__(data=data,
                          filename=filename,
                          trialdefinition=trialdefinition,
-                         channel=channel,
+                         channel1=channel1,
+                         channel2=channel2,
                          mode=mode,
                          dimord=dimord)
 

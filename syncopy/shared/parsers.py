@@ -797,6 +797,7 @@ def method_keyword_parser(method, avail_methods):
             print(wrng.format(calling=callerName, kw=key, m=method))
     kws.remove("noCompute")
     kws.remove("chunkShape")
+    kws.remove("inMemory")
     
     # Construct readily usable dictionary of method-specific keywords
     kws_dct = {}

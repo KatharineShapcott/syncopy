@@ -265,7 +265,7 @@ def mtmfft(trl_dat, dt, timeAxis,
            taper=spwin.hann, taperopt={}, tapsmofrq=None,
            pad="nextpow2", padtype="zero", padlength=None, foi=None,
            keeptapers=True, polyorder=None, output_fmt="pow",
-           noCompute=False, chunkShape=None):
+           noCompute=False, chunkShape=None, inMemory=True):
 
     # Re-arrange array if necessary and get dimensional information
     if timeAxis != 0:
