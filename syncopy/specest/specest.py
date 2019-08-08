@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-22 09:07:47
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-06 16:30:17>
+# Last modification time: <2019-08-08 10:32:29>
 
 # Builtin/3rd party package imports
 import sys
@@ -256,7 +256,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
     specestMethod.initialize(data)
     specestMethod.compute(data, out, parallel=use_dask, log_dict=log_dct)
 
-    # Either return newly created output container or simply quit
+    # Either return newly created output object or simply quit
     return out if new_out else None
 
 

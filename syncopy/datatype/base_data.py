@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-07 09:22:33
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-07 11:06:46>
+# Last modification time: <2019-08-08 10:50:41>
 
 # Builtin/3rd party package imports
 import numpy as np
@@ -221,15 +221,19 @@ class BaseData(ABC):
         if hasattr(self, "_dimord"):
             print("Syncopy core - dimord: Cannot change `dimord` of object. " +\
                   "Functionality currently not supported")
+            
+        # Create copies of input list to not mess w/default `dimord` keyword arg in class constructor
+        self._dimord = list(dims)
+        tmp = list(dims)
+        if tmp.count("channel") == 2:  # account for `ConnectivityData` objects
+            tmp.remove("channel")
+            self._channel1 = None
+            tmp.remove("channel")
+            self._channel2 = None
+            
         # Canonical way to perform initial allocation of dimensional properties 
         # (`self._channel = None`, `self._freq = None` etc.)            
-        self._dimord = list(dims)
-        if dims.count("channel") == 2:  # account for `ConnectivityData` objects
-            dims.remove("channel")
-            self._channel1 = None
-            dims.remove("channel")
-            self._channel2 = None
-        for dim in [dlabel for dlabel in dims if dlabel != "time"]:
+        for dim in [dlabel for dlabel in tmp if dlabel != "time"]:
             setattr(self, "_" + dim, None)
             
     @property

@@ -4,7 +4,7 @@
 # 
 # Created: 2019-07-24 14:22:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-07 09:36:28>
+# Last modification time: <2019-08-08 12:26:32>
 
 # Builtin/3rd party package imports
 import os
@@ -16,7 +16,7 @@ import numpy as np
 from syncopy.shared.parsers import (data_parser, scalar_parser, array_parser, 
                                     method_keyword_parser, unwrap_cfg)
 from syncopy.shared.computational_routine import ComputationalRoutine
-from syncopy.datatype import SpectralData, ConnectivityData
+from syncopy.datatype import AnalogData, SpectralData, ConnectivityData
 from syncopy.shared.errors import SPYValueError, SPYTypeError
 from syncopy import __dask__
 if __dask__:
@@ -106,22 +106,25 @@ def connectivityanalysis(data, method='coh', partchannel=None, complex="abs",
         except Exception as exc:
             raise exc
         
-    # If provided, make sure output object is appropriate
+    # If provided, make sure output object is appropriate for type of input 
+    dims = ["trial", "channel", "channel"]
+    if isinstance(data, SpectralData):
+        dims.insert(1, "freq")
     if out is not None:
         try:
             data_parser(out, varname="out", writable=True, empty=True,
                         dataclass="ConnectivityData",
-                        dimord=ConnectivityData().dimord)
+                        dimord=dims)
         except Exception as exc:
             raise exc
         new_out = False
     else:
-        out = ConnectivityData()
+        out = ConnectivityData(dimord=dims)
         new_out = True
         
     # Select appropriate compute kernel for requested method
     avail_kernels = ["corr"]
-    if method in ["coh", "corr", "cov" "csd", "plv", "amplcorr", "powcorr"]:
+    if method in ["coh", "corr", "cov", "csd", "plv", "amplcorr", "powcorr"]:
         
         # Set power-normalization based on chosen method
         if method in ["cov", "csd"]:
@@ -141,12 +144,13 @@ def connectivityanalysis(data, method='coh', partchannel=None, complex="abs",
         except ValueError:
             use_dask = False
             
-    import ipdb; ipdb.set_trace()
-
     # Perform actual computation
     connMethod.initialize(data)
     connMethod.compute(data, out, parallel=use_dask, log_dict=log_dct)
     
+    # Either return newly created output container or simply quit
+    return out if new_out else None
+
 
 def corr(trl_dat, dimord, pownorm=True, complex="abs",
          noCompute=False, chunkShape=None, inMemory=True):
@@ -164,76 +168,100 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
     else:
         shp = trl_dat.shape
     
-    # Set expected shape of output and get outta here if we're in the dry-run phase 
+    # Set expected output shape: if input comes from an `AnalogData` object, we
+    # simply use NumPy to compute correlation or covariance, otherwise things get nasty
     if len(shp) == 4:
         (_, nTaper, nFreq, nChannel) = shp
         outShape = (1, nFreq, nChannel, nChannel)
         outdtype = complexDTypes[complex]
+        useNumpy = False
     else:
         (_, nChannel) = shp
         outShape = (1, nChannel, nChannel)
         outdtype = trl_dat.dtype
+        useNumpy = True
+        
+    # Get outta here if we're in the dry-run phase 
     if noCompute:
         return outShape, outdtype
-
-    # See if we can parallelize across frequencies    
-    try:
-        dd.get_client()
-        parallel = True
-    except ValueError:
-        parallel = False
-        
-    # Get index of frequency dimension in input
-    freqidx = dimord[SpectralData().dimord.index("freq")] 
-        
-    if parallel:
-        
-        # Create a dask array chunked by frequency and map each taper-channel
-        # block onto `_corr` to compute channel x channel coherence/covariance
-        chunks = list(trl_dat.shape)
-        chunks[freqidx] = 1
-        dat = da.from_array(trl_dat, chunks=tuple(chunks))
-        
-        conn = dat.map_blocks(_corr, nChannel, nTaper, pownorm, 
-                              dtype=outdtype, 
-                              chunks=(1, 1, nChannel, nChannel))
-        conn = conn.reshape(1, nFreq, nChannel, nChannel)
-        
-        # Stacking gymnastics in case trials have different lengths (i.e., frequency-counts)
-        if nFreq < outShape[1]:
-            conn = da.hstack([conn, 
-                              da.zeros((1, outShape[1] - nFreq, nChannel, nChannel), 
-                                       dtype=conn.dtype)])
-            
+    
+    # The simple case: compute correlation or covariance of time-series
+    if useNumpy:
+        chanidx = dimord[AnalogData().dimord.index("channel")]
+        if chanidx == 0:
+            rowvar = True
+        else:
+            rowvar = False
+        if pownorm:
+            conn = np.corrcoef(trl_dat, rowvar=rowvar)
+        else:
+            conn = np.cov(trl_dat, rowvar=rowvar)
+    
+    # The fun part...        
     else:
 
-        # If trials don't fit into memory, `trl_dat` is already an HDF5 dataset -
-        # create a new HDF5 file parallel to `trl_dat`'s parent file and write results
-        # directly to it - flush after each frequency pass to not overflow memory
-        idx = [slice(None)] * len(dimord)
-        if inMemory:
-            conn = np.full(chunkShape, np.nan, dtype=outdtype)
+        # See if we can (further) parallelize across frequencies
+        if __dask__:
+            try:
+                dd.get_client()
+                # if nFreq * nChannel 
+                parallel = True
+            except ValueError:
+                parallel = False
+            
+        # Get index of frequency dimension in input
+        freqidx = dimord[SpectralData().dimord.index("freq")] 
+            
+        if parallel:
+            
+            # Create a dask array chunked by frequency and map each taper-channel
+            # block onto `_corr` to compute channel x channel coherence/covariance
+            chunks = list(trl_dat.shape)
+            chunks[freqidx] = 1
+            dat = da.from_array(trl_dat, chunks=tuple(chunks))
+            
+            conn = dat.map_blocks(_corr, nChannel, nTaper, pownorm, complex,
+                                  dtype=outdtype, 
+                                  chunks=(1, 1, nChannel, nChannel))
+            conn = conn.reshape(1, nFreq, nChannel, nChannel)
+            
+            # Stacking gymnastics in case trials have different lengths (i.e., frequency-counts)
+            if nFreq < outShape[1]:
+                conn = da.hstack([conn, 
+                                  da.zeros((1, outShape[1] - nFreq, nChannel, nChannel), 
+                                           dtype=conn.dtype)])
+                
         else:
-            h5f = h5py.File(trl_dat.file.filename.replace(".h5", "_result.h5"))
-            conn = h5f.create_dataset("trl", shape=outShape, dtype=outdtype)
-        
-        for nf in range(nFreq):
-            idx[freqidx] = nf
-            dat = np.squeeze(trl_dat[tuple(idx)])
-            tmp = np.dot(dat.reshape(nChannel, nTaper), dat.reshape(nTaper, nChannel))/nTaper
-            if pownorm:
-                tdg = np.diag(tmp)        
-                tmp /= np.sqrt(np.repeat(tdg.reshape(-1, 1), axis=1, repeats=nChannel) *
-                               np.repeat(tdg.reshape(1, -1), axis=0, repeats=nChannel))
-            conn[:, nf, :, :] = complexConversions[complex](tmp)
-            if not inMemory:
-                conn.flush()
-                dat.flush()
+
+            # If trials don't fit into memory, `trl_dat` is already an HDF5 dataset -
+            # create a new HDF5 file parallel to `trl_dat`'s parent file and write results
+            # directly to it - flush after each frequency pass to not overflow memory
+            idx = [slice(None)] * len(dimord)
+            if inMemory:
+                conn = np.full(chunkShape, np.nan, dtype=outdtype)
+            else:
+                h5f = h5py.File(trl_dat.file.filename.replace(".h5", "_result.h5"))
+                conn = h5f.create_dataset("trl", shape=outShape, dtype=outdtype)
+                
+            # If trials don't fit into memory, flush after each frequency pass
+            idx = [slice(None)] * len(dimord)            
+            for nf in range(nFreq):
+                idx[freqidx] = nf
+                dat = np.squeeze(trl_dat[tuple(idx)])
+                tmp = np.dot(dat.reshape(nChannel, nTaper), dat.reshape(nTaper, nChannel))/nTaper
+                if pownorm:
+                    tdg = np.diag(tmp)        
+                    tmp /= np.sqrt(np.repeat(tdg.reshape(-1, 1), axis=1, repeats=nChannel) *
+                                np.repeat(tdg.reshape(1, -1), axis=0, repeats=nChannel))
+                conn[:, nf, :, :] = complexConversions[complex](tmp)
+                if not inMemory:
+                    conn.flush()
+                    dat.flush()
                 
     return conn
 
     
-def _corr(blk, nChannel, nTaper, pownorm):
+def _corr(blk, nChannel, nTaper, pownorm, complex):
     
     tmp = da.dot(da.squeeze(blk).reshape(nChannel, nTaper), 
                  da.squeeze(blk).reshape(nTaper, nChannel))/nTaper
@@ -249,26 +277,9 @@ class ConnectivityCorr(ComputationalRoutine):
     computeFunction = staticmethod(corr)
     
     def process_metadata(self, data, out):
-
-        # Some index gymnastics to get trial begin/end "samples"
-        if self.keeptrials:
-            time = np.arange(len(data.trials))
-            time = time.reshape((time.size, 1))
-            out.sampleinfo = np.hstack([time, time + 1])
-            out.trialinfo = np.array(data.trialinfo)
-            out._t0 = np.zeros((len(data.trials),))
-        else:
-            out.sampleinfo = np.array([[0, 1]])
-            out.trialinfo = out.sampleinfo[:, 3:]
-            out._t0 = np.array([0])
-
-        # Attach remaining meta-data
-        out.samplerate = data.samplerate
-        out.channel = np.array(data.channel)
-        out.taper = np.array([self.cfg["taper"].__name__] * self.outputShape[out.dimord.index("taper")])
-        if self.cfg["foi"] is not None:
-            out.freq = self.cfg["foi"]
-        else:
-            nFreqs = self.outputShape[out.dimord.index("freq")]
-            out.freq = np.linspace(0, 1, nFreqs) * (data.samplerate / 2)
-            
+        
+        out.channel1 = data.channel  # FIXME: this should become `data.channel[chanidx1]` at some point
+        out.channel2 = data.channel  # FIXME: this should become `data.channel[chanidx2]` at some point
+        if isinstance(data, SpectralData):
+            out.freq = data.freq
+        out.trialinfo = data .trialinfo

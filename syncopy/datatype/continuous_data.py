@@ -4,7 +4,7 @@
 # 
 # Created: 2019-03-20 11:11:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-07 12:04:59>
+# Last modification time: <2019-08-08 11:25:48>
 """Uniformly sampled (continuous data).
 
 This module holds classes to represent data with a uniformly sampled time axis.
@@ -133,6 +133,7 @@ class ContinuousData(BaseData, ABC):
                             return dset  # returns dataset
             except:
                 try:
+                    # FIXME: include `inMemory` support
                     arr = np.array(open_memmap(filename, mode="c")[idx])
                 except:
                     raise SPYIOError(filename)

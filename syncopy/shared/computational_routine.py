@@ -4,7 +4,7 @@
 # 
 # Created: 2019-05-13 09:18:55
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-06 15:04:17>
+# Last modification time: <2019-08-08 12:08:32>
 
 # Builtin/3rd party package imports
 import os
@@ -302,9 +302,6 @@ class ComputationalRoutine(ABC):
             if trl_size >= mem_thresh * wrk_size:
                 trl_size /= 1024**3
                 wrk_size *= mem_thresh/1024**3
-                # msg = "Single-trial result sizes ({0:2.2f} GB) larger than available " +\
-                #       "worker memory ({1:2.2f} GB) currently not supported"
-                # raise NotImplementedError(msg.format(trl_size, wrk_size))
                 msg = "Single-trial result sizes ({0:2.2f} GB) larger than available " +\
                       "worker memory ({1:2.2f} GB) - caching trials from disk"
                 print("Syncopy compute_parallel: " + msg)
@@ -445,6 +442,12 @@ class ComputationalRoutine(ABC):
 
         # Ensure `data` is openend read-only to permit concurrent reading access
         data.mode = "r"
+        
+        # Special objects require special needs...
+        if hasattr(data, "hdr"):
+            hdr = data.hdr
+        else:
+            hdr = None
 
         # Depending on equidistance of trials use dask arrays directly...
         if np.all([data._preview_trial(tk).shape == data._preview_trial(0).shape 
@@ -456,7 +459,7 @@ class ComputationalRoutine(ABC):
                                     data.filename,
                                     data.dimord,
                                     data.sampleinfo,
-                                    hdr=data.hdr,
+                                    hdr=hdr,
                                     inMemory=self.inMemory)
                          for trialno in range(len(data.trials))]
 
@@ -484,7 +487,7 @@ class ComputationalRoutine(ABC):
                                           dtype=self.dtype,
                                           chunks=self.cfg["chunkShape"],
                                           **mbkwargs)
-            
+                                          
             # Re-arrange dimensional order
             result = result.reshape(self.outputShape)
 
@@ -505,7 +508,7 @@ class ComputationalRoutine(ABC):
                                                                       data.filename,
                                                                       data.dimord,
                                                                       data.sampleinfo,
-                                                                      data.hdr)
+                                                                      hdr)
 
             # Map each element of the bag onto ``computeFunction`` to get a new bag
             res_bag = trl_bag.map(self.computeFunction, *self.argv, **self.cfg)
@@ -521,10 +524,8 @@ class ComputationalRoutine(ABC):
             if not self.keeptrials:
                 pass
 
-
         # Submit the array to be processed by the worker swarm
         result = result.persist()
-        
         return result
 
     def compute_sequential(self, data, out):

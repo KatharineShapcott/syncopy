@@ -4,7 +4,7 @@
 # 
 # Created: 2019-08-06 10:00:25
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-07 09:36:57>
+# Last modification time: <2019-08-08 12:58:57>
 
 # Builtin/3rd party package imports
 import dask.distributed as dd
@@ -19,6 +19,9 @@ import numpy as np
 
 # Import SynCoPy
 import syncopy as spy
+
+
+sys.exit()
 
 # Import artificial data generator
 from syncopy.tests.misc import generate_artifical_data
@@ -40,4 +43,14 @@ if __name__ == "__main__":
     spec = spy.freqanalysis(artdata, cfg)
     
     # Take result of spectral analysis to compute all-to-all coherence
-    conn = spy.connectivityanalysis(spec)
+    cfg = spy.StructDict()
+    cfg.method = "coh"
+    cfg.complex = "abs"
+    conn = spy.connectivityanalysis(spec, cfg)
+    
+    # test coh, corr, cov, csd
+    client = spy.esi_cluster_setup(partition="DEV", mem_per_job="4GB", workers_per_job=2)
+    res = spy.connectivityanalysis(spec, cfg)
+    
+    # conn_corr = spy.connectivityanalysis(artdata, method="corr")
+    # conn_cov = spy.connectivityanalysis(artdata, method="cov")

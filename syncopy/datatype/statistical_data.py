@@ -4,7 +4,7 @@
 # 
 # Created: 2019-07-25 13:57:57
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-07 11:58:21>
+# Last modification time: <2019-08-08 11:17:04>
 
 # Builtin/3rd party package imports
 import numpy as np
@@ -136,7 +136,7 @@ class ConnectivityData(BaseData, ABC):
                  channel2="second_channel_dim",
                  mode="w",
                  dimord=["trial", "freq", "channel", "channel"]):
-
+        
         # The one thing we check right here and now
         if dimord.count("channel") != 2:
             lgl = "channel x channel specification"
@@ -148,6 +148,9 @@ class ConnectivityData(BaseData, ABC):
             lgl = base.format("'" + "' x '".join(str(dim) for dim in expected) + "'")
             act = base.format("'" + "' x '".join(str(dim) for dim in dimord) + "'")
             raise SPYValueError(legal=lgl, varname="dimord", actual=act)
+        
+        # For base correlation/covariance objects, ensure `_freq` is set
+        self._freq = None
 
         # Call parent initializer
         super().__init__(data=data,
