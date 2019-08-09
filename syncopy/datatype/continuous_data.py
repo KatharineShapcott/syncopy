@@ -4,7 +4,7 @@
 # 
 # Created: 2019-03-20 11:11:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-08 11:25:48>
+# Last modification time: <2019-08-09 15:47:18>
 """Uniformly sampled (continuous data).
 
 This module holds classes to represent data with a uniformly sampled time axis.
@@ -122,15 +122,17 @@ class ContinuousData(BaseData, ABC):
                             return h5py.File(src, "r")["chk"]  # returns dataset
                         else:
                             hdfdir = os.path.splitext(AnalogData()._gen_filename())[0]
-                            os.makedirs(hdfdir,exist_ok=True)
-                            tgt = h5py.File(os.path.join(hdfdir, "{0:d}.h5".format(trialno)), "w")
+                            hdfcnt = os.path.join(hdfdir, "{0:d}.h5".format(trialno))
+                            os.makedirs(hdfdir, exist_ok=True)
+                            tgt = h5py.File(hdfcnt, "w")
                             try:
                                 dset = tgt.create_dataset("chk", data=dset[idx])
                             except MemoryError:
                                 raise NotImplementedError("Blockwise trial-copying not implemented yet. ")
                             except Exception as exc:
                                 raise exc
-                            return dset  # returns dataset
+                            tgt.close()
+                            return h5py.File(hdfcnt, "r")["chk"] # return read-only(!) dataset
             except:
                 try:
                     # FIXME: include `inMemory` support

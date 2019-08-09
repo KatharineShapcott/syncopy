@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-22 09:07:47
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-08 10:32:29>
+# Last modification time: <2019-08-09 16:21:38>
 
 # Builtin/3rd party package imports
 import sys
@@ -272,8 +272,6 @@ def mtmfft(trl_dat, dt, timeAxis,
         dat = trl_dat.T       # does not copy but creates view of `trl_dat`
     else:
         dat = trl_dat
-    if not isinstance(dat, np.ndarray):
-        import pdb; pdb.set_trace()
     dat = dat.squeeze()
 
     # Padding (updates no. of samples)

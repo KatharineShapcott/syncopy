@@ -4,7 +4,7 @@
 # 
 # Created: 2019-07-24 14:22:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-08 12:26:32>
+# Last modification time: <2019-08-09 17:04:47>
 
 # Builtin/3rd party package imports
 import os
@@ -167,7 +167,7 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
         shp = tuple([trl_dat.shape[dim] for dim in dimord])
     else:
         shp = trl_dat.shape
-    
+        
     # Set expected output shape: if input comes from an `AnalogData` object, we
     # simply use NumPy to compute correlation or covariance, otherwise things get nasty
     if len(shp) == 4:
@@ -176,9 +176,16 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
         outdtype = complexDTypes[complex]
         useNumpy = False
     else:
-        (_, nChannel) = shp
+        # Careful: if input is a dask-array chunk, `trl_dat` is 3-dimensional!
+        nChannel = shp[-1]
         outShape = (1, nChannel, nChannel)
         outdtype = trl_dat.dtype
+        if len(shp) == 3:
+            dat = trl_dat.squeeze()  # only creates a view
+            nuShape = outShape
+        else:
+            dat = trl_dat
+            nuShape = None
         useNumpy = True
         
     # Get outta here if we're in the dry-run phase 
@@ -193,9 +200,9 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
         else:
             rowvar = False
         if pownorm:
-            conn = np.corrcoef(trl_dat, rowvar=rowvar)
+            conn = np.corrcoef(dat, rowvar=rowvar).reshape(nuShape)
         else:
-            conn = np.cov(trl_dat, rowvar=rowvar)
+            conn = np.cov(dat, rowvar=rowvar).reshape(nuShape)
     
     # The fun part...        
     else:
@@ -204,8 +211,7 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
         if __dask__:
             try:
                 dd.get_client()
-                # if nFreq * nChannel 
-                parallel = True
+                parallel = False
             except ValueError:
                 parallel = False
             
@@ -247,8 +253,8 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
             idx = [slice(None)] * len(dimord)            
             for nf in range(nFreq):
                 idx[freqidx] = nf
-                dat = np.squeeze(trl_dat[tuple(idx)])
-                tmp = np.dot(dat.reshape(nChannel, nTaper), dat.reshape(nTaper, nChannel))/nTaper
+                dat = np.squeeze(trl_dat[tuple(idx)]).reshape(nChannel, nTaper)
+                tmp = np.dot(dat, dat.T)/nTaper
                 if pownorm:
                     tdg = np.diag(tmp)        
                     tmp /= np.sqrt(np.repeat(tdg.reshape(-1, 1), axis=1, repeats=nChannel) *
@@ -263,8 +269,8 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
     
 def _corr(blk, nChannel, nTaper, pownorm, complex):
     
-    tmp = da.dot(da.squeeze(blk).reshape(nChannel, nTaper), 
-                 da.squeeze(blk).reshape(nTaper, nChannel))/nTaper
+    dat = da.squeeze(blk).reshape(nChannel, nTaper)
+    tmp = da.dot(dat, dat.T)/nTaper 
     if pownorm:
         tdg = da.diag(tmp)        
         tmp /= da.sqrt(da.repeat(tdg.reshape(-1, 1), axis=1, repeats=nChannel) *

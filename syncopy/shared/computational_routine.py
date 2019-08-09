@@ -4,7 +4,7 @@
 # 
 # Created: 2019-05-13 09:18:55
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-08 12:08:32>
+# Last modification time: <2019-08-09 17:12:53>
 
 # Builtin/3rd party package imports
 import os
@@ -295,16 +295,13 @@ class ComputationalRoutine(ABC):
                 raise SPYIOError(msg.format(exc.args[0]))
 
             # Check if trials actually fit into memory before we start computing
-            if "SLURM" in client.cluster.__class__.__name__:
-                wrk_size = max(wrkr.memory_limit for wrkr in client.cluster.workers.values())
-            else:
-                wrk_size = max(wrkr.memory_limit for wrkr in client.cluster.workers)
+            wrk_size = max(wrkr.memory_limit for wrkr in client.cluster.workers.values())
             if trl_size >= mem_thresh * wrk_size:
                 trl_size /= 1024**3
                 wrk_size *= mem_thresh/1024**3
                 msg = "Single-trial result sizes ({0:2.2f} GB) larger than available " +\
                       "worker memory ({1:2.2f} GB) - caching trials from disk"
-                print("Syncopy compute_parallel: " + msg)
+                print("Syncopy compute_parallel: " + msg.format(trl_size, wrk_size))
                 self.inMemory = False
 
             # In some cases distributed dask workers suffer from spontaneous
@@ -453,21 +450,34 @@ class ComputationalRoutine(ABC):
         if np.all([data._preview_trial(tk).shape == data._preview_trial(0).shape 
                    for tk in range(data._sampleinfo.shape[0])]):
             
-            # Point to trials on disk by using delayed **static** method calls
-            lazy_trial = dask.delayed(data._copy_trial, traverse=False)
-            lazy_trls = [lazy_trial(trialno,
-                                    data.filename,
-                                    data.dimord,
-                                    data.sampleinfo,
-                                    hdr=hdr,
-                                    inMemory=self.inMemory)
-                         for trialno in range(len(data.trials))]
+            if self.inMemory:        
+                
+                # Point to trials on disk by using delayed **static** method calls
+                lazy_trial = dask.delayed(data._copy_trial, traverse=False)
+                lazy_trls = [lazy_trial(trialno,
+                                        data.filename,
+                                        data.dimord,
+                                        data.sampleinfo,
+                                        hdr=hdr,
+                                        inMemory=True)
+                                        # inMemory=self.inMemory)
+                            for trialno in range(len(data.trials))]
 
-            # Stack trials along new (3rd) axis inserted on the left
-            trl_block = stacking([da.from_delayed(trl, shape=data._shapes[sk],
-                                                  dtype=data.data.dtype)
-                                  for sk, trl in enumerate(lazy_trls)])
+                # Stack trials along new (3rd) axis inserted on the left
+                trl_block = stacking([da.from_delayed(trl, shape=data._shapes[sk],
+                                                    dtype=data.data.dtype)
+                                    for sk, trl in enumerate(lazy_trls)])
+                
+            else:
 
+                trl_block = stacking([da.from_array(data._copy_trial(trialno, 
+                                                                     data.filename, 
+                                                                     data.dimord, 
+                                                                     data.sampleinfo, 
+                                                                     hdr=hdr, 
+                                                                     inMemory=False)) 
+                                      for trialno in range(len(data.trials))])
+            
             # If result of computation has diverging chunk dimension, account for that:
             # chunkdiff > 0 : result is higher-dimensional
             # chunkdiff < 0 : result is lower-dimensional (!!!COMPLETELY UNTESTED!!!)

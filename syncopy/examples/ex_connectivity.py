@@ -4,7 +4,7 @@
 # 
 # Created: 2019-08-06 10:00:25
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-08 12:58:57>
+# Last modification time: <2019-08-09 15:14:37>
 
 # Builtin/3rd party package imports
 import dask.distributed as dd
@@ -20,16 +20,14 @@ import numpy as np
 # Import SynCoPy
 import syncopy as spy
 
-
-sys.exit()
-
 # Import artificial data generator
 from syncopy.tests.misc import generate_artifical_data
 
 if __name__ == "__main__":
 
     # Create small `AnalogData` object for testing
-    artdata = generate_artifical_data(nTrials=5, nChannels=16, equidistant=True, 
+    nTrials = 5
+    artdata = generate_artifical_data(nTrials=nTrials, nChannels=16, equidistant=True, 
                                       inmemory=True)
 
     # Create uniform `cfg` struct holding analysis config
@@ -38,6 +36,13 @@ if __name__ == "__main__":
     cfg.taper = "dpss"
     cfg.tapsmofrq = 9.3
     cfg.output = "abs"
+    
+    ff = spy.load('aa')
+    client = dd.Client()
+    conn = spy.connectivityanalysis(ff, method="corr")   
+    # spy.connectivityanalysis(ff, method="corr")
+   
+    sys.exit()
     
     # Perform spectral analysis
     spec = spy.freqanalysis(artdata, cfg)
@@ -48,9 +53,9 @@ if __name__ == "__main__":
     cfg.complex = "abs"
     conn = spy.connectivityanalysis(spec, cfg)
     
-    # test coh, corr, cov, csd
-    client = spy.esi_cluster_setup(partition="DEV", mem_per_job="4GB", workers_per_job=2)
-    res = spy.connectivityanalysis(spec, cfg)
+    # # test coh, corr, cov, csd
+    # client = spy.esi_cluster_setup(partition="DEV", mem_per_job="4GB", workers_per_job=1, n_jobs=nTrials)
+    # res = spy.connectivityanalysis(spec, cfg)
     
     # conn_corr = spy.connectivityanalysis(artdata, method="corr")
     # conn_cov = spy.connectivityanalysis(artdata, method="cov")
