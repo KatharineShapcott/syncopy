@@ -4,7 +4,7 @@
 # 
 # Created: 2019-08-06 10:00:25
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-09 15:14:37>
+# Last modification time: <2019-08-12 12:40:34>
 
 # Builtin/3rd party package imports
 import dask.distributed as dd
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     nTrials = 5
     artdata = generate_artifical_data(nTrials=nTrials, nChannels=16, equidistant=True, 
                                       inmemory=True)
-
+    
     # Create uniform `cfg` struct holding analysis config
     cfg = spy.StructDict()
     cfg.method = "mtmfft"
@@ -37,9 +37,8 @@ if __name__ == "__main__":
     cfg.tapsmofrq = 9.3
     cfg.output = "abs"
     
-    ff = spy.load('aa')
     client = dd.Client()
-    conn = spy.connectivityanalysis(ff, method="corr")   
+    conn = spy.connectivityanalysis(artdata, method="corr")
     # spy.connectivityanalysis(ff, method="corr")
    
     sys.exit()

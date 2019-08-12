@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-07 09:22:33
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-08 10:50:41>
+# Last modification time: <2019-08-12 10:47:51>
 
 # Builtin/3rd party package imports
 import numpy as np
@@ -1031,4 +1031,7 @@ class FauxTrial():
         while 1 in shp:
             shp.remove(1)
         return FauxTrial(shp, self.dtype)
-    
+
+    @property
+    def T(self):
+        return FauxTrial(self.shape[::-1], self.dtype)

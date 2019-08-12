@@ -4,7 +4,7 @@
 # 
 # Created: 2019-05-13 09:18:55
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-09 17:12:53>
+# Last modification time: <2019-08-12 16:14:25>
 
 # Builtin/3rd party package imports
 import os
@@ -464,8 +464,8 @@ class ComputationalRoutine(ABC):
                             for trialno in range(len(data.trials))]
 
                 # Stack trials along new (3rd) axis inserted on the left
-                trl_block = stacking([da.from_delayed(trl, shape=data._shapes[sk],
-                                                    dtype=data.data.dtype)
+                trl_block = stacking([da.from_delayed(trl, shape=data._preview_trial(sk).shape, 
+                                                      dtype=data.data.dtype)
                                     for sk, trl in enumerate(lazy_trls)])
                 
             else:
@@ -477,7 +477,7 @@ class ComputationalRoutine(ABC):
                                                                      hdr=hdr, 
                                                                      inMemory=False)) 
                                       for trialno in range(len(data.trials))])
-            
+                
             # If result of computation has diverging chunk dimension, account for that:
             # chunkdiff > 0 : result is higher-dimensional
             # chunkdiff < 0 : result is lower-dimensional (!!!COMPLETELY UNTESTED!!!)
@@ -535,7 +535,7 @@ class ComputationalRoutine(ABC):
                 pass
 
         # Submit the array to be processed by the worker swarm
-        result = result.persist()
+        # result = result.persist()
         return result
 
     def compute_sequential(self, data, out):
@@ -655,8 +655,7 @@ class ComputationalRoutine(ABC):
             writers = da_arr.map_blocks(self._write_parallel, nchk, self.vdsdir,
                                         dtype="int", chunks=(1,) * nchk)
 
-            # Make sure that all futures are actually executed (i.e., data is written
-            # to the container)
+            # Make sure that all futures are executed (i.e., data is actually saved)
             futures = dd.client.futures_of(writers.persist())
             while any(f.status == 'pending' for f in futures):
                 time.sleep(self.sleeptime)

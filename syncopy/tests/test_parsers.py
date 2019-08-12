@@ -4,7 +4,7 @@
 # 
 # Created: 2019-03-05 16:22:56
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-06 16:31:04>
+# Last modification time: <2019-08-12 11:33:18>
 
 import os
 import platform
@@ -318,19 +318,3 @@ def func(input, keyword=None):
 
 def test_get_defaults():
     assert get_defaults(func) == {"keyword": None}
-
-==== BASE ====
-
-def test_json_parser():
-    # wanted is subset + order shouldn't matter
-    actual = OrderedDict({"entry1": 1, "entry2": "2", "entry99": 99.9})
-    wanted = OrderedDict({"entry2": str, "entry1": int})
-    json_parser(actual, wanted)
-    # not all keys present (`wanted` and `actual` simply swap roles)
-    with pytest.raises(SPYValueError):
-        json_parser(wanted, actual)
-    # key is of wrong type
-    actual["entry2"] = 2
-    with pytest.raises(SPYTypeError):
-        json_parser(actual, wanted)
-==== BASE ====

@@ -24,7 +24,6 @@ import syncopy as spy
 # Import artificial data generator
 from syncopy.tests.misc import generate_artifical_data
 
-sys.exit()
 
 if __name__ == "__main__":
 
@@ -51,11 +50,11 @@ if __name__ == "__main__":
     cfg.keeptrials = False
     artdata = generate_artifical_data(nTrials=5, nChannels=16, equidistant=True, inmemory=True)
     
-    artdata.save('test', overwrite=True)
-    bdata = spy.load('test')
+    # artdata.save('test', overwrite=True)
+    # bdata = spy.load('test')
     
-    sys.exit()
-    
+    # sys.exit()
+      
     spec = freqanalysis(artdata, cfg)
     
 
