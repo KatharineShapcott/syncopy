@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-07 09:22:33
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-12 10:47:51>
+# Last modification time: <2019-08-30 13:22:16>
 
 # Builtin/3rd party package imports
 import numpy as np
@@ -1014,9 +1014,38 @@ class StructDict(dict):
 
 
 class FauxTrial():
+    """
+    Stand-in mockup for NumPy arrays representing trial data
     
-    def __init__(self, shape, dtype):
+    Parameters
+    ----------
+    shape : tuple
+        Shape of source trial array 
+    idx : tuple
+        Tuple of slices for extracting trial-data from source object's `data`
+        dataset. The provided tuple **has** to be a proper indexing sequence, 
+        i.e., if `idx` refers to the `k`-th trial in `obj`, then ``obj.data[idx]``
+        must slice `data` correctly so that ``obj.data[idx] == obj.trials[k]``
+    dtype : :class:`numpy.dtype`
+        Datatype of source trial array
+        
+    Returns
+    -------
+    faux_trl : FauxTrial object
+        An instance of `FauxTrial` that essentially parrots :class:`numpy.ndarray`
+        objects and can, thus, be used to feed "fake" trials into a 
+        :meth:`syncopy.shared.computational_routine.ComputationalRoutine.computeFunction`
+        to get the `noCompute` runs out of the way w/o actually loading trials 
+        into memory. 
+        
+    See also
+    --------
+    syncopy.continuous_data.ContinuousData._preview_trial : makes use of this class
+    """
+    
+    def __init__(self, shape, idx, dtype):
         self.shape = tuple(shape)
+        self.idx = tuple(idx)
         self.dtype = dtype
         
     def __str__(self):
@@ -1027,11 +1056,19 @@ class FauxTrial():
         return self.__str__()
 
     def squeeze(self):
+        """
+        Remove 1's from shape and return a new `FauxTrial` instance 
+        (parroting the NumPy original :func:`numpy.squeeze`)
+        """
         shp = list(self.shape)
         while 1 in shp:
             shp.remove(1)
-        return FauxTrial(shp, self.dtype)
+        return FauxTrial(shp, self.idx, self.dtype)
 
     @property
     def T(self):
-        return FauxTrial(self.shape[::-1], self.dtype)
+        """
+        Return a new `FauxTrial` instance with reversed dimensions
+        (parroting the NumPy original :func:`numpy.transpose`)
+        """
+        return FauxTrial(self.shape[::-1], self.idx[::-1], self.dtype)

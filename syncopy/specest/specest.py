@@ -4,7 +4,7 @@
 # 
 # Created: 2019-01-22 09:07:47
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-09 16:21:38>
+# Last modification time: <2019-08-30 13:29:59>
 
 # Builtin/3rd party package imports
 import sys
@@ -28,6 +28,7 @@ from syncopy.shared.computational_routine import ComputationalRoutine
 from syncopy.datatype import SpectralData, padding
 import syncopy.specest.wavelets as spywave 
 from syncopy.shared.errors import SPYValueError, SPYTypeError
+from syncopy.shared.parsers import unwrap_cfg, unwrap_io
 from syncopy import __dask__
 if __dask__:
     import dask
@@ -52,13 +53,13 @@ def freqanalysis(data, method='mtmfft', output='fourier',
                  padlength=None, polyremoval=False, polyorder=None,
                  taper="hann", tapsmofrq=None, keeptapers=True,
                  wav="Morlet", toi=0.1, width=6,
-                 out=None, **kwargs):
+                 out=None, chan_per_worker=None, **kwargs):
     """
     Explain taperopt...
     Explain default of toi (value b/w 0 and 1 indicating percentage of samplerate
     to use as stepsize)
     """
-
+    
     # Make sure our one mandatory input object can be processed
     try:
         data_parser(data, varname="data", dataclass="AnalogData",
@@ -253,7 +254,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
 
     # Perform actual computation
     specestMethod = methods[method]
-    specestMethod.initialize(data)
+    specestMethod.initialize(data, chan_per_worker=chan_per_worker)
     specestMethod.compute(data, out, parallel=use_dask, log_dict=log_dct)
 
     # Either return newly created output object or simply quit
@@ -261,6 +262,7 @@ def freqanalysis(data, method='mtmfft', output='fourier',
 
 
 # Local workhorse that performs the computational heavy lifting
+@unwrap_io
 def mtmfft(trl_dat, dt, timeAxis,
            taper=spwin.hann, taperopt={}, tapsmofrq=None,
            pad="nextpow2", padtype="zero", padlength=None, foi=None,
@@ -302,11 +304,13 @@ def mtmfft(trl_dat, dt, timeAxis,
     if noCompute:
         return outShape, spectralDTypes[output_fmt]
 
+    # Get final output shape from `chunkShape` keyword modulo per-worker channel-count
     # In case tapers aren't kept allocate `spec` "too big" and average afterwards
+    shp = list(chunkShape)
+    shp[-1] = nChannels
     if not keeptapers:
-        shp = list(chunkShape)
         shp[1] = nTaper
-        chunkShape = tuple(shp)
+    chunkShape = tuple(shp)
     spec = np.full(chunkShape, np.nan, dtype=spectralDTypes[output_fmt])
     fill_idx = tuple([slice(None, dim) for dim in outShape[2:]])
 

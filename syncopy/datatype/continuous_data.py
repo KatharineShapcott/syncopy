@@ -4,7 +4,7 @@
 # 
 # Created: 2019-03-20 11:11:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-09 15:47:18>
+# Last modification time: <2019-08-30 13:23:17>
 """Uniformly sampled (continuous data).
 
 This module holds classes to represent data with a uniformly sampled time axis.
@@ -77,7 +77,7 @@ class ContinuousData(BaseData, ABC):
     @samplerate.setter
     def samplerate(self, sr):
         try:
-            scalar_parser(sr, varname="samplerate", lims=[1, np.inf])
+            scalar_parser(sr, varname="samplerate", lims=[np.finfo('float').eps, np.inf])
         except Exception as exc:
             raise exc
         self._samplerate = float(sr)
@@ -86,7 +86,7 @@ class ContinuousData(BaseData, ABC):
     def time(self):
         """list(float): trigger-relative time axes of each trial """
         if self.samplerate is not None and self._sampleinfo is not None:
-            return [np.arange(-self.t0[tk], end - start - self.t0[tk]) * 1/self.samplerate \
+            return [np.arange(self.t0[tk], end - start - self.t0[tk]) * 1/self.samplerate \
                     for tk, (start, end) in enumerate(self.sampleinfo)]
 
     # Selector method
@@ -98,7 +98,10 @@ class ContinuousData(BaseData, ABC):
 
     # Helper function that reads a single trial into memory
     @staticmethod
-    def _copy_trial(trialno, filename, dimord, sampleinfo, hdr=None, inMemory=True):
+    def _copy_trial(trialno, filename, dimord, sampleinfo, hdr):
+        """
+        # FIXME: currently unused - check back to see if we need this functionality
+        """
         idx = [slice(None)] * len(dimord)
         idx[dimord.index("time")] = slice(int(sampleinfo[trialno, 0]), int(sampleinfo[trialno, 1]))
         idx = tuple(idx)
@@ -156,11 +159,38 @@ class ContinuousData(BaseData, ABC):
                                                int(self.sampleinfo[trialno, 1]))
         return self._data[tuple(idx)]
     
+    # Helper function that spawns a `FauxTrial` object given actual trial information    
     def _preview_trial(self, trialno):
-        shp = list(self.data.shape)
-        shp[self.dimord.index("time")] = int(self.sampleinfo[trialno, 1]) - int(self.sampleinfo[trialno, 0])
-        return FauxTrial(shp, self.data.dtype)
+        """
+        Generate a `FauxTrial` instance of a trial
         
+        Parameters
+        ----------
+        trialno : int
+            Number of trial the `FauxTrial` object is intended to mimic
+            
+        Returns
+        -------
+        faux_trl : :class:`syncopy.datatype.base_data.FauxTrial`
+            An instance of :class:`syncopy.datatype.base_data.FauxTrial` mainly
+            intended to be used in `noCompute` runs of 
+            :meth:`syncopy.shared.computational_routine.ComputationalRoutine.computeFunction`
+            to avoid loading actual trial-data into memory. 
+            
+        See also
+        --------
+        syncopy.datatype.base_data.FauxTrial : class definition and further details
+        syncopy.shared.computational_routine.ComputationalRoutine : Syncopy compute engine
+        """
+        shp = list(self.data.shape)
+        idx = [slice(None)] * len(self.dimord)
+        tidx = self.dimord.index("time")
+        stop = int(self.sampleinfo[trialno, 1])
+        start = int(self.sampleinfo[trialno, 0])
+        shp[tidx] = stop - start
+        idx[tidx] = slice(start, stop)
+        return FauxTrial(shp, tuple(idx), self.data.dtype)
+    
     # Make instantiation persistent in all subclasses
     def __init__(self, **kwargs):
 
