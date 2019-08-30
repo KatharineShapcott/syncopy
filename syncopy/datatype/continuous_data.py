@@ -4,7 +4,7 @@
 # 
 # Created: 2019-03-20 11:11:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-30 13:23:17>
+# Last modification time: <2019-08-30 16:12:35>
 """Uniformly sampled (continuous data).
 
 This module holds classes to represent data with a uniformly sampled time axis.
@@ -213,10 +213,10 @@ class ContinuousData(BaseData, ABC):
                 # First, fill in dimensional info
                 definetrial(self, kwargs.get("trialdefinition"))
 
-        # Dummy assignment: if we have no data but channel labels, assign bogus to trigger setter warning
-        else:
-            if isinstance(kwargs.get("channel"), (list, np.ndarray)):
-                self.channel = ['channel']
+        # Set channel labels or perform potential dummy assignment: if we have 
+        # no data but channel labels, assign bogus to trigger setter warning
+        if isinstance(kwargs.get("channel"), (list, np.ndarray)):
+            self.channel = kwargs["channel"]
                 
 
 class AnalogData(ContinuousData):

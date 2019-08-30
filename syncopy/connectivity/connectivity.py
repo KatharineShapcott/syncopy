@@ -4,7 +4,7 @@
 # 
 # Created: 2019-07-24 14:22:44
 # Last modified by: Stefan Fuertinger [stefan.fuertinger@esi-frankfurt.de]
-# Last modification time: <2019-08-09 17:04:47>
+# Last modification time: <2019-08-30 16:38:18>
 
 # Builtin/3rd party package imports
 import os
@@ -256,9 +256,10 @@ def corr(trl_dat, dimord, pownorm=True, complex="abs",
                 dat = np.squeeze(trl_dat[tuple(idx)]).reshape(nChannel, nTaper)
                 tmp = np.dot(dat, dat.T)/nTaper
                 if pownorm:
-                    tdg = np.diag(tmp)        
+                    tdg = np.diag(tmp)
                     tmp /= np.sqrt(np.repeat(tdg.reshape(-1, 1), axis=1, repeats=nChannel) *
-                                np.repeat(tdg.reshape(1, -1), axis=0, repeats=nChannel))
+                                   np.repeat(tdg.reshape(1, -1), axis=0, repeats=nChannel))
+                    import ipdb; ipdb.set_trace()
                 conn[:, nf, :, :] = complexConversions[complex](tmp)
                 if not inMemory:
                     conn.flush()
