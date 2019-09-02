@@ -26,7 +26,7 @@ import syncopy as spy
 # Import artificial data generator
 from syncopy.tests.misc import generate_artifical_data
 
-sys.exit()
+# sys.exit()
 
 if __name__ == "__main__":
 
@@ -54,6 +54,9 @@ if __name__ == "__main__":
     # artdata.save('test', overwrite=True)
     # bdata = spy.load('test')
     spec1 = freqanalysis(artdata, cfg)
+    
+    sys.exit(0)
+    
     client = dd.Client()
     spec2 = freqanalysis(artdata, cfg)
     
