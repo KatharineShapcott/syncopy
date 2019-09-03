@@ -50,12 +50,12 @@ if __name__ == "__main__":
     cfg.tapsmofrq = 9.3
     cfg.keeptrials = True
     artdata = generate_artifical_data(nTrials=2, nChannels=16, equidistant=True, inmemory=True)
+    sys.exit()
     
     # artdata.save('test', overwrite=True)
     # bdata = spy.load('test')
     spec1 = freqanalysis(artdata, cfg)
     
-    sys.exit(0)
     
     client = dd.Client()
     spec2 = freqanalysis(artdata, cfg)
