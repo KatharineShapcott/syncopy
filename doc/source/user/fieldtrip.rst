@@ -132,11 +132,11 @@ can be computed in Syncopy with
 .. code-block:: python
       
     cfg = spy.get_defaults(spy.freqanalysis)
-    cfg.method = 'mtmfft';
-    cfg.foilim = [1, 150];
-    cfg.output = 'pow';
-    cfg.taper = 'dpss';
-    cfg.tapsmofrq = 10;
+    cfg.method = 'mtmfft'
+    cfg.foilim = [1, 150]
+    cfg.output = 'pow'
+    cfg.taper = 'dpss'
+    cfg.tapsmofrq = 10
     spec = spy.freqanalysis(cfg, data)
 
 
